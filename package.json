@@ -12,6 +12,7 @@
     "cheerio": "^0.18.0",
     "parallel-transform": "^0.2.2",
     "request": "^2.53.0",
+    "tough-cookie": "^0.12.1",
     "yargs": "^3.0.4"
   }
 }

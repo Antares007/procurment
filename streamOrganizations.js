@@ -7,7 +7,7 @@ module.exports = function(session) {
     return 'https://tenders.procurement.gov.ge/engine/controller.php?action=org_list&search_org_type=0&page=' + n;
   };
 
-  return session.stream(
+  session.stream(
     makeUrl(i),
     function(prevUrl, $) {
       return makeUrl(++i);

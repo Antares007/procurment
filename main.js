@@ -8,60 +8,66 @@ if(argv._.length !== 1) {
   console.log('add module name as argument');
   return;
 }
+var j = request.jar();
+request = request.defaults({jar: j});
 
-var cookieJar = request.jar();
+var headers = {
+  'Connection': 'keep-alive',
+  'Cache-Control': 'max-age=0',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+  'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/40.0.2214.94 Safari/537.36',
+  'Accept-Language': 'en-US,en;q=0.8,ka;q=0.6,de;q=0.4,ru;q=0.2'
+};
+
+var session = {
+  postForm: function(url, form, cb) {
+    request.post({
+      url : url,
+      form: form,
+      headers: headers
+    }, function(error, response, body) {
+      if(error || response.statusCode !== 200) {
+        return cb(error || response.statusCode);
+      }
+      cb(null, body);
+    });
+  },
+  get: function(url, cb) {
+    request.get({
+      url : url,
+      headers: headers
+    }, function(error, response, body) {
+      if(error || response.statusCode !== 200) {
+        return cb(error || response.statusCode);
+      }
+      cb(null, cheerio.load(body), body);
+    });
+  },
+  stream: function(url, nextUrl, parser) {
+    var get = this.get;
+    var currentUrl = url;
+    return new stream.Readable({
+      objectMode: true,
+      read: function(n) {
+        var ds = this;
+        get(currentUrl, function(err, $) {
+          currentUrl = nextUrl(currentUrl, $);
+          ds.push(parser($));
+        });
+      }
+    });
+  }
+};
 
 request.post({
   url : 'https://tenders.procurement.gov.ge/login.php',
-  jar: cookieJar,
-  form: {user:'qutateladze', pass:'natali2008', lang: 'ge'}
+  form: {user:'qutateladze', pass:'natali2008', lang: 'ge'},
+  headers: headers
 }, function(error, response, body) {
   if(error || response.statusCode !== 302) {
     throw error || response.statusCode;
   }
-
   var module = require(argv._[0]);
-  module(session(cookieJar));
+  module(session);
 });
 
-function session(cookieJar) {
-  return {
-    postForm: function(url, form, cb) {
-      request.post({
-        url : url,
-        jar: cookieJar,
-        form: form
-      }, function(error, response, body) {
-        if(error || response.statusCode !== 200) {
-          return cb(error || response.statusCode);
-        }
-        cb(null, body);
-      });
-    },
-    get: function(url, cb) {
-      request.get({
-        url : url,
-        jar: cookieJar
-      }, function(error, response, body) {
-        if(error || response.statusCode !== 200) {
-          return cb(error || response.statusCode);
-        }
-        cb(null, cheerio.load(body));
-      });
-    },
-    stream: function(url, nextUrl, parser) {
-      var get = this.get;
-      var currentUrl = url;
-      return new stream.Readable({
-        objectMode: true,
-        read: function(n) {
-          var ds = this;
-          get(currentUrl, function(err, $) {
-            currentUrl = nextUrl(currentUrl, $);
-            ds.push(parser($));
-          });
-        }
-      });
-    }
-  };
-}
