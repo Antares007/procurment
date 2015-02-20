@@ -28,19 +28,15 @@ module.exports = function(session) {
     }
   ).pipe(
     transform(function(chunk, next) {
+      var cbcount = chunk.length;
       var ds = this;
       chunk.forEach(function(x) {
-        ds.push(x);
-      });
-      next();
-    })
-  ).pipe(
-    transform(function(chunk, next) { 
-      var ds = this;
-      tematika(chunk.id, function(err, tematika) {
-        chunk.tematika = tematika;
-        ds.push(JSON.stringify(chunk) + '\n');
-        next();
+        tematika(x.id, function(err, tematika) {
+          x.tematika = tematika;
+          ds.push(JSON.stringify(x) + '\n');
+          cbcount--;
+          if(cbcount === 0) next();
+        });
       });
     })
   ).pipe(

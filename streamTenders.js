@@ -26,19 +26,16 @@ module.exports = function(session) {
     }
   ).pipe(
     transform(function(chunk, next) {
+      var cbcount = chunk.length;
       var ds = this;
       chunk.forEach(function(x) {
-        ds.push(x);
-      });
-      next();
-    })
-  ).pipe(
-    transform(function(chunk, next) { 
-      var ds = this;
-      shetavazebebi(chunk.id, function(err, shetavazebebi) {
-        chunk.shetavazebebi = shetavazebebi;
-        ds.push(JSON.stringify(chunk) + '\n');
-        next();
+        shetavazebebi(x.id, function(err, shetavazebebi) {
+          x.shetavazebebi = shetavazebebi;
+          ds.push(JSON.stringify(x) + '\n');
+          cbcount--;
+          console.log(cbcount);
+          if(cbcount === 0) next();
+        });
       });
     })
   ).pipe(
