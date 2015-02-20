@@ -8,7 +8,7 @@ module.exports = function(session) {
     },
     function($) {
       var list = $('tbody tr').map(function(i, e) {
-        var id = $(this).attr('id');
+        var id = $(this).attr('id').slice(1);
         var td = $(this).children('td').last().children('p').map(function(){
           return $(this).text();
         }).get().reduce(function(acc, textLine) {
@@ -35,10 +35,31 @@ module.exports = function(session) {
   ).pipe(
     transform(function(chunk, next) { 
       var ds = this;
-      ds.push(JSON.stringify(chunk) + '\n');
-      next();
+      shetavazebebi(chunk.id, function(err, shetavazebebi) {
+        chunk.shetavazebebi = shetavazebebi;
+        ds.push(JSON.stringify(chunk) + '\n');
+        next();
+      });
     })
   ).pipe(
     process.stdout
   );
+
+  function shetavazebebi(tenderId, cb) {
+    session.get('https://tenders.procurement.gov.ge/engine/controller.php?action=app_bids&app_id=' + tenderId, function(err, $, body) {
+      if(err) {
+        return cb(err);
+      }
+      var shetavazebebi = $('tbody tr', $('table').first()).map(function(){
+        var td = $(this).children('td').first();
+        return {
+          orgId: td.children('a').first().attr('onclick').trim().slice('ShowProfile('.length, -1),
+          orgName: td.find('span').text().trim(),
+          boloShetavazeba: (td = td.next(), td.find('strong').text()),
+          pirveliShetavazeba: (td = td.next(), td.text().split(String.fromCharCode(160))[0].trim()),
+        };
+      }).get();
+      cb(null, shetavazebebi);
+    });
+  }
 };
