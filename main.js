@@ -67,7 +67,12 @@ request.post({
   if(error || response.statusCode !== 302) {
     throw error || response.statusCode;
   }
-  var module = require(argv._[0]);
-  module(session);
+  session.get('https://tenders.procurement.gov.ge', function(err) {
+    if(err) { 
+      throw err;
+    }  
+    var module = require(argv._[0]);
+    module(session);
+  });
 });
 
