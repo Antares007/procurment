@@ -34,8 +34,7 @@ module.exports = function(session) {
         tematika(x.id, function(err, tematika) {
           x.tematika = tematika;
           ds.push(JSON.stringify(x) + '\n');
-          cbcount--;
-          if(cbcount === 0) next();
+          if(--cbcount === 0) next();
         });
       });
     })

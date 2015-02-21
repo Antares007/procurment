@@ -32,9 +32,7 @@ module.exports = function(session) {
         shetavazebebi(x.id, function(err, shetavazebebi) {
           x.shetavazebebi = shetavazebebi;
           ds.push(JSON.stringify(x) + '\n');
-          cbcount--;
-          console.log(cbcount);
-          if(cbcount === 0) next();
+          if(--cbcount === 0) next();
         });
       });
     })
