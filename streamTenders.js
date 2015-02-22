@@ -1,44 +1,46 @@
 var transform = require('./transform.js');
+var parseTender = require('./parseTenderListPage.js');
 
 module.exports = function(session) {
-  session.stream(
-    'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=1',
-    function(prevUrl, $) {
-      return 'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=next';
-    },
-    function($) {
-      var list = $('tbody tr').map(function(i, e) {
-        var id = $(this).attr('id').slice(1);
-        var td = $(this).children('td').last().children('p').map(function(){
-          return $(this).text();
-        }).get().reduce(function(acc, textLine) {
-          var segments = textLine.split(':');
-          if(segments.length === 1) {
-            acc.states.push(textLine.trim());
-          } else {
-            acc[segments[0]] = segments.splice(1).join(':').trim();
-          }
-          return acc;
-        }, {id: id, states: []});
-        return td;
-      }).get();
-      return list.length > 0 ? list : null;
+  var searchForm = {
+    action:'search_app', search:'', app_reg_id:'', app_shems_id:'0', org_a:'',
+    app_monac_id:'0', org_b:'', app_status:'0', app_agr_status:'0', app_type:'0',
+    app_t:'0', app_basecode:'0', app_codes:'',
+    app_date_type:'1',
+    app_date_from:'01.02.2012',
+    app_date_tlll:'02.02.2012',
+    app_amount_from:'', app_amount_to:'', app_pricelist:'0', app_manufacturer_id:'0',
+    app_manufacturer:'', app_model_id:'0', app_model:'', app_currency:'2'
+  };
+  session.postForm('https://tenders.procurement.gov.ge/engine/controller.php', searchForm, function(err) {
+    if(err) {
+      throw err;
     }
-  ).pipe(
-    transform(function(chunk, next) {
-      var cbcount = chunk.length;
-      var ds = this;
-      chunk.forEach(function(x) {
-        shetavazebebi(x.id, function(err, shetavazebebi) {
-          x.shetavazebebi = shetavazebebi;
-          ds.push(JSON.stringify(x) + '\n');
-          if(--cbcount === 0) next();
+    session.stream(
+      'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=1',
+      function(prevUrl, $) {
+        return 'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=next';
+      },
+      function($) {
+        var list = parseTender($);
+        return list.length > 0 ? list : null;
+      }
+    ).pipe(
+      transform(function(chunk, next) {
+        var cbcount = chunk.length;
+        var ds = this;
+        chunk.forEach(function(x) {
+          shetavazebebi(x.id, function(err, shetavazebebi) {
+            x.shetavazebebi = shetavazebebi;
+            ds.push(JSON.stringify(x) + '\n');
+            if(--cbcount === 0) next();
+          });
         });
-      });
-    })
-  ).pipe(
-    process.stdout
-  );
+      })
+    ).pipe(
+      process.stdout
+    );
+  });
 
   function shetavazebebi(tenderId, cb) {
     session.get('https://tenders.procurement.gov.ge/engine/controller.php?action=app_bids&app_id=' + tenderId, function(err, $, body) {
