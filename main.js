@@ -1,5 +1,9 @@
 #!/usr/bin/env iojs
-var argv = require('yargs').argv;
+var argv = require('yargs')
+  .usage('Usage: $0 -user [userName] -pass [password]')
+  .demand(['user','pass'])
+  .argv;
+
 var stream = require('stream');
 var request = require('request');
 var cheerio = require('cheerio');
@@ -61,7 +65,7 @@ var session = {
 
 request.post({
   url : 'https://tenders.procurement.gov.ge/login.php',
-  form: {user:'qutateladze', pass:'natali2008', lang: 'ge'},
+  form: {user:argv.user, pass:argv.pass, lang: 'ge'},
   headers: headers
 }, function(error, response, body) {
   if(error || response.statusCode !== 302) {

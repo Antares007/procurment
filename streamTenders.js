@@ -1,3 +1,7 @@
+var argv = require('yargs')
+  .usage('Module usage: -from [fromDate] -to [toDate]')
+  .demand(['from','to'])
+  .argv;
 var transform = require('./transform.js');
 var parseTender = require('./parseTenderListPage.js');
 
@@ -7,8 +11,8 @@ module.exports = function(session) {
     app_monac_id:'0', org_b:'', app_status:'0', app_agr_status:'0', app_type:'0',
     app_t:'0', app_basecode:'0', app_codes:'',
     app_date_type:'1',
-    app_date_from:'01.02.2012',
-    app_date_tlll:'02.02.2012',
+    app_date_from:argv.from,
+    app_date_tlll:argv.to,
     app_amount_from:'', app_amount_to:'', app_pricelist:'0', app_manufacturer_id:'0',
     app_manufacturer:'', app_model_id:'0', app_model:'', app_currency:'2'
   };
