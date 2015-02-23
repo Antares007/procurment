@@ -1,0 +1,318 @@
+<div class="ui-widget-content ui-corner-top">
+
+<button id="b1" type="button" onclick="$.get('engine/controller.php',{search_org_type:0, action:'org_list'}, function(data) {$('#app_list').html(data);});">ყველა</button>
+
+<div style="display: inline-block">
+    <button id="b2" type="button">შემსყიდველები</button>
+    <button class="ui-state-error-text" id="inactive_b2">დეაქტივირებული შემსყიდველები</button>
+</div>
+
+<button id="b3" type="button" onclick="$.get('engine/controller.php',{search_org_type:1, action:'org_list'}, function(data) {$('#app_list').html(data);});">მიმწოდებლები</button>
+<button id="b5" type="button" onclick="$.get('engine/controller.php',{search_org_type:2, action:'org_list'}, function(data) {$('#app_list').html(data);});">პრეტენდენტები შემსყიდველობაზე</button>
+
+
+
+<button id="b4a" type="button" onclick="window.open('http://procurement.gov.ge/index.php?lang_id=GEO&sec_id=14');">შავი სია</button>
+
+<button id="b6" type="button" onclick="$.get('engine/controller.php',{search_org_type:0, whitelisted:1, action:'org_list'}, function(data) {$('#app_list').html(data);});">თეთრი სია</button>
+
+<div class="pad4px">
+<form name="search_org" id="search_org" method="post" action="engine/controller.php">
+<input type="hidden" name="action" value="org_list">
+<input type="hidden" name="search" value="1">
+ორგანიზაციის დასახელება <input type="text" size="16" name="search_org_name" maxlength="10">&nbsp;
+საიდენტიფიკაციო კოდი <input type="text" size="12" name="search_org_taxcode" maxlength="25">&nbsp;<button type="submit" id="search_org_btn">ძებნა</button>
+
+</form>
+</div>
+
+<table id="list_orgs" width="100%" cellspacing="1" cellpadding="6" class="ktable">
+<colgroup>
+<col>
+<col width="170">
+<col width="120">
+<col>
+</colgroup>
+	<thead>
+		<tr class="ui-widget-header">
+			<td>*</td>
+			<td>*</td>
+			<td>დარეგისტრირდა</td>
+			<td>*</td>
+		</tr>
+	</thead>
+	<tbody>
+	<tr onclick="ShowProfile(45961)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> Karapet</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>პრეტენდენტი შემსყიდველობაზე</td>
+	</tr><tr onclick="ShowProfile(45960)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> შპს არგიკო</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45956)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> არჩილ ბოლქვაძე</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45955)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> შპს Climate House</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45954)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> შპს გიგგრუპი</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45953)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> ზვიად ფხალაძე</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45950)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> შპს ქიზიყი 2014</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45949)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> შპს სამედიცინო ხარისხი</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45947)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> შპს გურა</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45945)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> ვალერიან ხუხუნეისვილი</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45944)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> შპს  MAHIR TEKSTIL</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45943)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> შპს ტისუპეიპერ</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45942)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> გენადი ბაჯელიძე</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45941)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> თამარი აკობიძე</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45940)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> შპს ბილდინგ გრუპი</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45939)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> მალხაზ ველიჯანაშვილი</span></td>
+		<td>
+			
+			
+		</td>
+		<td>21.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45938)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> შპს ლენიქსი</span></td>
+		<td>
+			
+			
+		</td>
+		<td>20.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45935)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> შპს პროსპორტი</span></td>
+		<td>
+			
+			
+		</td>
+		<td>20.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45934)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> კონსტანტინე კორძაია</span></td>
+		<td>
+			
+			
+		</td>
+		<td>20.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr><tr onclick="ShowProfile(45933)">
+		<td><span class="blacklisted0"><img src="images/profile24_0.png"> შპს Complex Pro კომპლექს პრო</span></td>
+		<td>
+			
+			
+		</td>
+		<td>20.02.2015</td>
+		<td>მიმწოდებელი</td>
+	</tr>
+	</tbody>
+</table>
+
+</div><div class="pager pad4px">
+    <span>
+    	<button id="btn_first" type="button">&nbsp;</button>
+		<button id="btn_prev" type="button">&nbsp;</button>
+		<button type="button">25374&nbsp;ჩანაწერი&nbsp;(გვერდი: 2/1269)</button>
+		<button 1 id="btn_next" type="button">&nbsp;</button>
+		<button 1 id="btn_last" type="button">&nbsp;</button>
+	</span>
+</div>
+
+<script>
+
+	$('#b1').button({icons: {primary: "ui-icon-folder-open"}});
+
+    $("#b2").button().click(function() {
+        $.get('engine/controller.php', {
+            search_org_type : 3,
+            action : 'org_list'
+        }, function(data) {
+            $('#app_list').html(data);
+        });
+    }).next().button({
+        text : false,
+        icons : {
+            primary : "ui-icon-circle-close"
+        }
+    }).click(function() {
+        $.get('engine/controller.php', {
+            search_org_type : 4,
+            action : 'org_list'
+        }, function(data) {
+            $('#app_list').html(data);
+        });
+    }).parent().buttonset();
+
+
+	$('#b3').button({icons: {primary: "ui-icon-folder-open"}});
+	$('#b4').button({icons: {primary: "ui-icon-folder-open"}});
+	$('#b4a').button({icons: {primary: "ui-icon-folder-open"}});
+	$('#b5').button({icons: {primary: "ui-icon-folder-open"}});
+	$('#b6').button({icons: {primary: "ui-icon-folder-open"}});
+
+	$('#search_org_btn').button({icons:{primary: "ui-icon-search"}});
+	$('#search_org').submit(function() {
+	        $(this).ajaxSubmit({target:'#app_list'});
+	        return false;
+	});
+
+	$('#list_orgs tr').alternate({hover:true});
+
+	$('#orgrole').buttonset();
+
+	GeoKBD.map('search_org');
+
+	var plastpage = eval('1269');
+
+    $(function(){
+        $("#back_button").button({
+			icons: {primary: 'ui-icon-triangle-1-w'}
+		}).click(function(){
+			$('#app_list').hide();
+			$('#subject_list').show();
+        });
+
+		$("#btn_first").button({
+			text: false,
+			icons: {primary: "ui-icon-seek-first"}
+		}
+		).click(function() {
+			$.get('engine/controller.php', {action:'org_list', search_org_type:eval('0'), page: 1, list_type:eval('0')}, function(res){$('#app_list').html(res);});
+		})
+		.next()
+
+		.button({
+			text: false,
+			icons: {primary: "ui-icon-seek-prev"}
+		})
+		.click(function() {
+			$.get('engine/controller.php', {action:'org_list', search_org_type:eval('0'), page:'prev', list_type:eval('0')}, function(res){$('#app_list').html(res);});
+		})
+		.next()
+
+		.button({
+			icons: {primary: "ui-icon-refresh"}
+		})
+		.click(function() {
+			$.get('engine/controller.php', {action:'org_list', search_org_type:eval('0'), page:'current',list_type:eval('0')}, function(res){$('#app_list').html(res);});
+		})
+		.next()
+
+		.button({
+			text: false,
+			icons: {primary: "ui-icon-seek-next"}
+		}
+		).click(function() {
+			$.get('engine/controller.php', {action:'org_list', search_org_type:eval('0'), page:'next', list_type:eval('0')}, function(res){$('#app_list').html(res);});
+		})
+		.next()
+
+		.button({
+			text: false,
+			icons: {primary: "ui-icon-seek-end"}
+		})
+		.click(function() {
+			$.get('engine/controller.php', {action:'org_list', search_org_type:eval('0'), page:plastpage, list_type:eval('0') }, function(res){$('#app_list').html(res);});
+		})
+		.parent()
+		.buttonset();
+    });
+</script>
