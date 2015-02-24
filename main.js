@@ -1,4 +1,5 @@
 #!/usr/bin/env iojs
+require("babel/register");
 var argv = require('yargs')
   .usage('Usage: $0 -user [userName] -pass [password]')
   .demand(['user','pass'])

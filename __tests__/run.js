@@ -1,3 +1,4 @@
+require("babel/register");
 var argv = require('yargs').argv;
 var fs = require('fs');
 var path = require('path');
