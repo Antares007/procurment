@@ -66,7 +66,18 @@ var valueParsers = {
   'გარანტიის ოდენობა': function(td){
     return parseAmount(textTrim(td));
   },
-  'გარანტიის მოქმედების ვადა': textTrim
+  'გარანტიის მოქმედების ვადა': textTrim,
+
+  'პრეისკურანტის სავარაუდო ღირებულება': function(td){
+    return parseAmount(textTrim(td));
+  },
+  'შესყიდვის ობიექტის სახელშეკრულებო ღირებულება': function(td){
+    return {
+      'თანხა': parseAmount(td.find('span').first().text().trim()),
+      'შენიშვნა': td.find('span').first().next().text().trim()
+    };
+  },
+  'დონორი': textTrim,
 };
 
 module.exports = function(htmlStr) {
@@ -79,6 +90,7 @@ module.exports = function(htmlStr) {
   .get()
   .reduce(function(state, td){
     var maybeKey = td.text().trim();
+    // console.log(maybeKey);
     if(valueParsers.hasOwnProperty(maybeKey)){
       state.parserKey = maybeKey;
     } else {

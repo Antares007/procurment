@@ -2,10 +2,10 @@ var argv = require('yargs')
   .usage('Module usage: -from [fromDate] -to [toDate]')
   .demand(['from','to'])
   .argv;
-var transform = require('./transform.js');
-var parseTender = require('./parseTenderListPage.js');
 
 module.exports = function(session) {
+  var get = require('./denodeify.js')(session.get);
+  
   var searchForm = {
     action:'search_app', search:'', app_reg_id:'', app_shems_id:'0', org_a:'',
     app_monac_id:'0', org_b:'', app_status:'0', app_agr_status:'0', app_type:'0',
@@ -26,42 +26,75 @@ module.exports = function(session) {
         return 'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=next';
       },
       function(body) {
-        var list = parseTender(body);
+        var list = require('./parseTenderListPage.js')(body);
         return list.length > 0 ? list : null;
       }
     ).pipe(
-      transform(function(chunk, next) {
-        var cbcount = chunk.length;
-        var ds = this;
-        chunk.forEach(function(x) {
-          shetavazebebi(x.id, function(err, shetavazebebi) {
-            x.shetavazebebi = shetavazebebi;
-            ds.push(JSON.stringify(x) + '\n');
-            if(--cbcount === 0) next();
-          });
+      asyncTransform(async function(tenderIds){
+        var mainPages = tenderIds.map(async function(tenderId) {
+          var rez = await get('https://tenders.procurement.gov.ge/engine/controller.php?action=app_main&app_id=' + tenderId)
+          console.log('parseMainPage' + tenderId);
+          return require('./parseTenderMainPage.js')(rez);
         });
+
+        var bidsPages = tenderIds.map(async function(tenderId) {
+          var rez = await get('https://tenders.procurement.gov.ge/engine/controller.php?action=app_bids&app_id=' + tenderId)
+          console.log('parseBidsPage' + tenderId);
+          return require('./parseTenderBidsPage.js')(rez);
+        });
+
+        var agencyDocsPages = tenderIds.map(async function(tenderId) {
+          var rez = await get('https://tenders.procurement.gov.ge/engine/controller.php?action=agency_docs&app_id=' + tenderId)
+          console.log('parseAgencyDocsPages' + tenderId);
+          return require('./parseTenderAgencyDocsPage.js')(rez);
+        });
+
+        var tenders = await Promise.all(mainPages);
+        var bids = await Promise.all(bidsPages);
+        var docs = await Promise.all(agencyDocsPages);
+
+        return tenderIds.reduce(
+          (s, id, i) => (
+            s.push(Object.assign({ id: id }, tenders[i], { 'შეთავაზებები': bids[i], 'მიმწოდებელი': docs[i] })), 
+            s
+          ), []);
+      })
+    ).pipe(
+      transform(function(tenders, next){
+        var ds = this;
+        tenders.forEach(function(t){
+          ds.push(JSON.stringify(t) + '\n\n');
+        });
+        next();
       })
     ).pipe(
       process.stdout
     );
   });
-
-  function shetavazebebi(tenderId, cb) {
-    session.get('https://tenders.procurement.gov.ge/engine/controller.php?action=app_bids&app_id=' + tenderId, function(err, body) {
-      if(err) {
-        return cb(err);
-      }
-      var $ = require('cheerio').load(body);
-      var shetavazebebi = $('tbody tr', $('table').first()).map(function(){
-        var td = $(this).children('td').first();
-        return {
-          orgId: td.children('a').first().attr('onclick').trim().slice('ShowProfile('.length, -1),
-          orgName: td.find('span').text().trim(),
-          boloShetavazeba: (td = td.next(), td.find('strong').text()),
-          pirveliShetavazeba: (td = td.next(), td.text().split(String.fromCharCode(160))[0].trim()),
-        };
-      }).get();
-      cb(null, shetavazebebi);
-    });
-  }
 };
+
+function transform(fn){
+  return new require('stream').Transform({
+    objectMode: true,
+    transform: function(chunk, _, next){
+      fn.call(this, chunk, next);
+    }
+  })
+}
+
+function asyncTransform(fn){
+  return new require('stream').Transform({
+    objectMode: true,
+    transform: function(chunk, _, next){
+      var ds = this; 
+      fn(chunk).then(function(rez){ 
+        ds.push(rez);
+        next(); 
+      }).catch(function(err){
+        process.nextTick(function(){
+          ds.emit('error', err);
+        })
+      });
+    }
+  })
+}
