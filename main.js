@@ -7,7 +7,6 @@ var argv = require('yargs')
 
 var stream = require('stream');
 var request = require('request');
-var cheerio = require('cheerio');
 
 if(argv._.length !== 1) {
   console.log('add module name as argument');
@@ -45,7 +44,7 @@ var session = {
       if(error || response.statusCode !== 200) {
         return cb(error || response.statusCode);
       }
-      cb(null, cheerio.load(body), body);
+      cb(null, body);
     });
   },
   stream: function(url, nextUrl, parser) {
@@ -55,9 +54,9 @@ var session = {
       objectMode: true,
       read: function(n) {
         var ds = this;
-        get(currentUrl, function(err, $) {
-          currentUrl = nextUrl(currentUrl, $);
-          ds.push(parser($));
+        get(currentUrl, function(err, body) {
+          currentUrl = nextUrl(currentUrl, body);
+          ds.push(parser(body));
         });
       }
     });
@@ -80,4 +79,3 @@ request.post({
     module(session);
   });
 });
-

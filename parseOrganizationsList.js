@@ -1,4 +1,5 @@
-module.exports = function($) {
+module.exports = function(htmlStr) {
+  var $ = require('cheerio').load(htmlStr);
   var list = $('tbody tr').map(function(i, e){
     var el = $(this);
     var tds = el.children('td');

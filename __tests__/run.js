@@ -5,7 +5,7 @@ var path = require('path');
 var assert = require('assert');
 
 if(argv._.length === 1) {
-  console.log(parse(argv._[0].split('/')[1], argv._[0]));
+  console.log(JSON.stringify(parse(argv._[0].split('/')[1], argv._[0]), null, '  '));
 } else {
   runAllTests();
 }
@@ -31,5 +31,5 @@ function runAllTests() {
 
 function parse(parserName, actualHtmlFile) {
   var cheerio = require('cheerio');
-  return require('../' + parserName)(cheerio.load(fs.readFileSync(actualHtmlFile, 'utf8')));
+  return require('../' + parserName)(fs.readFileSync(actualHtmlFile, 'utf8'));
 }

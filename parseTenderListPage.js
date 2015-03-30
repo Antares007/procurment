@@ -1,4 +1,5 @@
-module.exports = function($) {
+module.exports = function(htmlStr) {
+  var $ = require('cheerio').load(htmlStr);
   return $('tbody tr').map(function(i, e) {
     var id = $(this).attr('id');
     if(!id || id[0] !== 'A') {

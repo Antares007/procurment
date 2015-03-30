@@ -1,56 +1,93 @@
-module.exports = function($) {
-  var keyvalues = [];
-  var savedKey;
-
-  $('table').filter(function() {
-    return $(this).find('td').first().text() === 'ტენდერის ტიპი';
-  }).first()
-    .find('tbody tr')
-    .each(function(){
-      var tds = $(this).children();
-      if(tds.length === 2) {
-        savedKey = null;
-        keyvalues.push({ key: tds.first(), value: tds.last() });
-      } else if(tds.length === 1) {
-        if(savedKey) {
-          keyvalues.push({ key: savedKey, value: tds.first() });
-          savedKey = null;
-        } else {
-          savedKey = tds.first();
-        }
-      }
-    });
-  var valueParsers = {
-    'სატენდერო განცხადების ნომერი': function(value) {
-      return value.find('strong').first().text();
-    },
-    'შემსყიდველი': function(value) {
-      return {
-        id: value.find('a').attr('onclick').slice('ShowProfile('.length, -1),
-        name: value.text().trim()
-      };
-    },
-    'default': function(value) {
-      var values = value.text()
-        .trim()
-        .split('\n')
-        .map(function(x) { return x.trim(); })
-        .filter(function(x) { return x; });
-      return values.length > 1 ? values : values[0];
-    }
-  };
-  var rez = keyvalues.map(function(x) {
-    var key = x.key.text().trim();
-    var value = 
-      valueParsers[key] ? valueParsers[key](x.value) : valueParsers['default'](x.value);
+var $ = require('cheerio');
+var cheerio = $;
+var textTrim = function(td){
+  return td.text().trim();
+};
+var parseDate = function (str) {
+  var parts = str.split(/\.| /);
+  return new Date(`${parts[2]}-${parts[1]}-${parts[0]} ${parts[3]}`);
+};
+var parseAmount = function (str) {
+  var parts = str.replace(/`/g,'').split(' ');
+  return {amount:parseFloat(parts[0]), currency:parts[1]};
+};
+var valueParsers = {
+  'ტენდერის ტიპი': textTrim,
+  'სატენდერო განცხადების ნომერი': function(td){
+    return td.find('strong').first().text();
+  },
+  'ტენდერის სტატუსი': textTrim,
+  'შემსყიდველი': function(td){
+    var onclick = td.find('a').first().attr('onclick');
     return {
-      key: key,
-      value: value
+      id: /^.+\((\d+)\)$/.exec(onclick)[1],
+      'დასახელება': td.text().trim()
     };
-  });
-  return rez.reduce(function(memo, x) {
-    memo[x.key] = x.value;
-    return memo;
-  }, {});
+  },
+  'ტენდერის გამოცხადების თარიღი': function(td){
+    return parseDate(textTrim(td));
+  },
+  'წინადადებების მიღება იწყება': function(td){
+    return parseDate(textTrim(td));
+  },
+  'წინადადებების მიღება მთავრდება': function(td){
+    return parseDate(textTrim(td));
+  },
+  'დაფინანსების წყარო': textTrim,
+  'შესყიდვის სავარაუდო ღირებულება': function(td){
+    return {
+      'თანხა': parseAmount(td.find('span').first().text().trim()),
+      'შენიშვნა': td.find('span').first().next().text().trim()
+    };
+  },
+  'სატენდერო წინადადება წარმოდგენილი უნდა იყოს': textTrim,
+  'კლასიფიკატორის  (CPV) კოდი და  კლასიფიკატორის დანაყოფი': function(td){
+    return td.find('div ul li').map(function(){
+      return $(this).text().trim();
+    }).get();
+  },
+  'კლასიფიკატორის  (CPV) კოდი და შესყიდვის კონკრეტული ობიექტი': function(td){
+    return td.find('div ul li').map(function(){
+      return $(this).text().trim();
+    }).get();
+  },
+  'დამატებითი ინფორმაცია': function(td){
+    var value = td.text().trim();
+    if(value === '') return;
+    return td.text().trim();
+  },
+  'შესყიდვის რაოდენობა ან მოცულობა': textTrim,
+  'მოწოდების ვადა': function(td){
+    return td.text().trim();
+  },
+  'შეთავაზების ფასის კლების ბიჯი': function(td){
+    return parseAmount(textTrim(td));
+  },
+  'გარანტიის ოდენობა': function(td){
+    return parseAmount(textTrim(td));
+  },
+  'გარანტიის მოქმედების ვადა': textTrim
 };
 
+module.exports = function(htmlStr) {
+  var $ = cheerio.load(htmlStr);
+  return $('table').filter(function() {
+    return $(this).find('td').first().text() === 'ტენდერის ტიპი';
+  }).first()
+  .find('tbody tr td')
+  .map(function(){ return $(this); })
+  .get()
+  .reduce(function(state, td){
+    var maybeKey = td.text().trim();
+    if(valueParsers.hasOwnProperty(maybeKey)){
+      state.parserKey = maybeKey;
+    } else {
+      var rez = valueParsers[state.parserKey](td);
+      if(typeof rez !== 'undefined'){
+        state.rez[state.parserKey] = rez;
+        state.parserKey = null;
+      }
+    }
+    return state;
+  }, { rez:{} }).rez;
+};

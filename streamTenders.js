@@ -11,8 +11,8 @@ module.exports = function(session) {
     app_monac_id:'0', org_b:'', app_status:'0', app_agr_status:'0', app_type:'0',
     app_t:'0', app_basecode:'0', app_codes:'',
     app_date_type:'1',
-    app_date_from:argv.from,
-    app_date_tlll:argv.to,
+    app_date_from: argv.from,
+    app_date_tlll: argv.to,
     app_amount_from:'', app_amount_to:'', app_pricelist:'0', app_manufacturer_id:'0',
     app_manufacturer:'', app_model_id:'0', app_model:'', app_currency:'2'
   };
@@ -22,11 +22,11 @@ module.exports = function(session) {
     }
     session.stream(
       'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=1',
-      function(prevUrl, $) {
+      function(prevUrl, body) {
         return 'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=next';
       },
-      function($) {
-        var list = parseTender($);
+      function(body) {
+        var list = parseTender(body);
         return list.length > 0 ? list : null;
       }
     ).pipe(
@@ -47,10 +47,11 @@ module.exports = function(session) {
   });
 
   function shetavazebebi(tenderId, cb) {
-    session.get('https://tenders.procurement.gov.ge/engine/controller.php?action=app_bids&app_id=' + tenderId, function(err, $, body) {
+    session.get('https://tenders.procurement.gov.ge/engine/controller.php?action=app_bids&app_id=' + tenderId, function(err, body) {
       if(err) {
         return cb(err);
       }
+      var $ = require('cheerio').load(body);
       var shetavazebebi = $('tbody tr', $('table').first()).map(function(){
         var td = $(this).children('td').first();
         return {
