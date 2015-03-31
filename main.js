@@ -60,6 +60,9 @@ var session = {
       read: function(n) {
         var ds = this;
         get(currentUrl, function(err, body) {
+          if(err) {
+            ds.emit('error', err);
+          }
           currentUrl = nextUrl(currentUrl, body);
           ds.push(parser(body));
         });

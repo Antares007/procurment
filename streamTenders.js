@@ -4,7 +4,27 @@ var argv = require('yargs')
   .argv;
 
 module.exports = function(session) {
-  var get = require('./denodeify.js')(session.get);
+  var db = require('level')('./cache');
+
+  var get = require('./denodeify.js')(function(url, cb){
+    db.get('url!'+url, function(err, page){
+      if (err) {
+        if (err.notFound) {
+          session.get(url, function(err, page){
+            if(err) {
+              return cb(err);
+            }
+            db.put('url!'+url, page);
+            cb(null, page);
+          });
+          return
+        }
+        return cb(err);
+      } else {
+        cb(null, page);
+      }
+    })
+  });
   
   var searchForm = {
     action:'search_app', search:'', app_reg_id:'', app_shems_id:'0', org_a:'',
@@ -20,32 +40,44 @@ module.exports = function(session) {
     if(err) {
       throw err;
     }
+    var i = 1;
+    var k = 0;
+
     session.stream(
-      'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=1',
+      'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=' + i,
       function(prevUrl, body) {
-        return 'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=next';
+        i++;
+        return 'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=' + i;
       },
       function(body) {
         var list = require('./parseTenderListPage.js')(body);
         return list.length > 0 ? list : null;
       }
     ).pipe(
+      transform(function(tenders, next){
+        var ds = this;
+        tenders.forEach(function(t){
+          ds.push([t]);
+        });
+        next();
+      })
+    ).pipe(
       asyncTransform(async function(tenderIds){
         var mainPages = tenderIds.map(async function(tenderId) {
           var rez = await get('https://tenders.procurement.gov.ge/engine/controller.php?action=app_main&app_id=' + tenderId)
-          console.log('parseMainPage' + tenderId);
+          // console.log('parseMainPage' + tenderId);
           return require('./parseTenderMainPage.js')(rez);
         });
 
         var bidsPages = tenderIds.map(async function(tenderId) {
           var rez = await get('https://tenders.procurement.gov.ge/engine/controller.php?action=app_bids&app_id=' + tenderId)
-          console.log('parseBidsPage' + tenderId);
+          // console.log('parseBidsPage' + tenderId);
           return require('./parseTenderBidsPage.js')(rez);
         });
 
         var agencyDocsPages = tenderIds.map(async function(tenderId) {
           var rez = await get('https://tenders.procurement.gov.ge/engine/controller.php?action=agency_docs&app_id=' + tenderId)
-          console.log('parseAgencyDocsPages' + tenderId);
+          // console.log('parseAgencyDocsPages' + tenderId);
           return require('./parseTenderAgencyDocsPage.js')(rez);
         });
 
@@ -63,7 +95,8 @@ module.exports = function(session) {
       transform(function(tenders, next){
         var ds = this;
         tenders.forEach(function(t){
-          ds.push(JSON.stringify(t) + '\n\n');
+          k++;
+          ds.push(k + ' ' + JSON.stringify(t) + '\n\n');
         });
         next();
       })

@@ -11,7 +11,9 @@
   "dependencies": {
     "babel": "^4.7.16",
     "cheerio": "^0.18.0",
+    "level": "^0.18.0",
     "parallel-transform": "^0.2.2",
+    "readable-stream": "~1.1.0",
     "request": "^2.53.0",
     "tough-cookie": "^0.12.1",
     "yargs": "^3.0.4"
