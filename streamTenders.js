@@ -2,6 +2,9 @@ var argv = require('yargs')
   .usage('Module usage: -from [fromDate] -to [toDate]')
   .demand(['from','to'])
   .argv;
+var transform = require('./transform.js');
+var asyncTransform = require('./asyncTransform.js');
+
 var debugLevel = require('debug')('level');
 
 module.exports = async function(session) {
@@ -100,29 +103,3 @@ module.exports = async function(session) {
     process.stdout
   );
 };
-
-function transform(fn){
-  return new require('stream').Transform({
-    objectMode: true,
-    transform: function(chunk, _, next){
-      fn.call(this, chunk, next);
-    }
-  })
-}
-
-function asyncTransform(fn){
-  return new require('stream').Transform({
-    objectMode: true,
-    transform: function(chunk, _, next){
-      var ds = this;
-      fn(chunk).then(function(rez){
-        ds.push(rez);
-        next();
-      }).catch(function(err){
-        process.nextTick(function(){
-          ds.emit('error', err);
-        })
-      });
-    }
-  })
-}

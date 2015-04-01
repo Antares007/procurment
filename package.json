@@ -16,6 +16,7 @@
     "level": "^0.18.0",
     "multilevel": "^6.1.0",
     "parallel-transform": "^0.2.2",
+    "querystring": "^0.2.0",
     "readable-stream": "~1.1.0",
     "request": "^2.53.0",
     "request-replay": "^0.3.0",

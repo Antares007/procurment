@@ -1,15 +1,13 @@
 var stream = require('stream');
 
-var transform = function(cb) {
-  return new stream.Transform({
+var transform = function(fn, flushFn){
+  return new require('stream').Transform({
     objectMode: true,
-    transform: function(chunk, encoding, next) {
-      cb.call(this, chunk, next);
+    transform: function(chunk, _, next){
+      fn.call(this, chunk, next);
     },
-    flush: function(done) {
-      done();
-    }
-  });
+    flush: flushFn
+  })
 };
 
 module.exports = transform;
