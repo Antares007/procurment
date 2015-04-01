@@ -73,13 +73,13 @@ module.exports = async function(session) {
 
           var pages = await Promise.all(promisedPages);
 
+          var mainJson = require('./parseTenderMainPage.js')(pages[0].body);
+
           await dbBatch(
             pages
               .map(p => ({ type: 'put', key: p.url, value: p.body }))
               .concat({ type: 'put', key: 'tender!' + tenderId, value: 'n/a' })
           );
-
-          var mainJson = require('./parseTenderMainPage.js')(pages[0].body);
 
           return {
             id: tenderId,
