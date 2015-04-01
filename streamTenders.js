@@ -61,24 +61,25 @@ module.exports = async function(session) {
         if(err.notFound) {
           var makePageUrl = (action) =>
             `https://tenders.procurement.gov.ge/engine/controller.php?action=${action}&app_id=${tenderId}`;
-          var pages = ['app_main', 'app_docs', 'app_bids', 'app_result', 'agency_docs'];
-          var promisedRequests = pages.map(p => get(makePageUrl(p)));
-          var htmlPages = await Promise.all(promisedRequests);
-          var validContents = htmlPages.filter((str, i) => str.indexOf(`<div id="${pages[i]}">`) >= 0);
-          if(validContents.length !==  pages.length) {
-            throw new Error('invalid page content');
-          }
-          var mainJson = require('./parseTenderMainPage.js')(htmlPages[0]);
+          var pageNames = ['app_main', 'app_docs', 'app_bids', 'app_result', 'agency_docs'];
+          var promisedPages = pageNames.map(async function(page) {
+            var url = makePageUrl(page);
+            var str = await get(url);
+            if(str.indexOf(`<div id="${page}">`) < 0) {
+              throw new Error('invalid page content');
+            }
+            return { url, body: str };
+          });
 
-          await dbBatch(htmlPages.map((value, i) => ({
-            type: 'put',
-            key: makePageUrl(pages[i]),
-            value: value
-          })).concat([{
-            type: 'put',
-            key: 'tender!' + tenderId,
-            value: 'n/a'
-          }]));
+          var pages = await Promise.all(promisedPages);
+
+          await dbBatch(
+            pages
+              .map(p => ({ type: 'put', key: p.url, value: p.body }))
+              .concat({ type: 'put', key: 'tender!' + tenderId, value: 'n/a' })
+          );
+
+          var mainJson = require('./parseTenderMainPage.js')(pages[0].body);
 
           return {
             id: tenderId,
