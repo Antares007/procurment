@@ -42,7 +42,8 @@ var session = {
     });
   },
   get: function(url, cb) {
-    request.get({
+    var replay = require('request-replay');
+    replay(request.get({
       url : url,
       headers: headers
     }, function(error, response, body) {
@@ -50,6 +51,11 @@ var session = {
         return cb(error || response.statusCode);
       }
       cb(null, body);
+    })).on('replay', function (replay) {
+      // "replay" is an object that contains some useful information 
+      console.log('request failed: ' + replay.error.code + ' ' + replay.error.message);
+      console.log('replay nr: #' + replay.number);
+      console.log('will retry in: ' + replay.delay + 'ms')
     });
   },
   stream: function(url, nextUrl, parser) {
@@ -84,6 +90,15 @@ request.post({
       throw err;
     }  
     var module = require(argv._[0]);
-    module(session);
+    var rez = module(session);
+    if(rez instanceof Promise){
+      rez.then(
+        function(){
+          console.log('done!');
+        },
+        function(err){
+          console.error(err);
+        })
+    }
   });
 });

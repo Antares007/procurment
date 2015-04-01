@@ -78,6 +78,9 @@ var valueParsers = {
     };
   },
   'დონორი': textTrim,
+  'ერთეულის სავარაუდო ღირებულება': function(td){
+    return parseAmount(textTrim(td));
+  },
 };
 
 module.exports = function(htmlStr) {
