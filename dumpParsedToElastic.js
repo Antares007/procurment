@@ -5,16 +5,19 @@ var request = require('request').defaults({
 });
 
 level('./parsedDb', {
+  keyEncoding: require('bytewise'),
   valueEncoding: 'json'
 }).createReadStream({
-  reverse: true,
+  // reverse: true,
+  gt: ['tender', null],
+  lt: ['tender', undefined],
   // limit: 20,
 }).pipe(
   (function(){
     var lastId;
     var collected = {};
     return transform(function(kv, next){
-      var parts = kv.key.split('!');
+      var parts = kv.key;
       var id = parts[1];
       var page = parts[2];
 
@@ -46,7 +49,10 @@ level('./parsedDb', {
       body: obj
     },
     function(err, res, body){
-      console.log(err, res.statusCode, body);
+      if(err){
+        this.emit('error', err);
+      }
+      console.log(res.statusCode, body);
       next();
     });
   })

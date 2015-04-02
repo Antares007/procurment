@@ -13,9 +13,11 @@ var counters = Object.keys(parsers).reduce(function(s,k){
 }, {});
 
 var parsedDb = level('./parsedDb', {
+  keyEncoding: require('bytewise'),
   valueEncoding: 'json'
 });
 
+var i = 0;
 level('/data/cache').createReadStream({
   gt: 'https://tenders.procurement.gov.ge/engine/controller.php?action=!',
   lt: 'https://tenders.procurement.gov.ge/engine/controller.php?action=~',
@@ -29,13 +31,16 @@ level('/data/cache').createReadStream({
     }
 
     if(parsers[params.action]){
-      var key = 'tender!'+ params.app_id + '!' + params.action;
+      var key = ['tender', parseInt(params.app_id, 10), params.action];
       var json = parsers[params.action](kv.value);
       if(json){
         parsedDb.put(key, json);
         counters[params.action]++;
-        ds.push(key + '\n');
+        // ds.push(key + '\n');
       }
+    }
+    if(++i % 1000 === 0){
+      this.push(JSON.stringify(counters) + '\n');
     }
     next();
   })
