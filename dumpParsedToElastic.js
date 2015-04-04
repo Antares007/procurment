@@ -44,6 +44,9 @@ level('./parsedDb', {
   })
 ).pipe(
   transform(function(obj, next){
+    // console.log(obj);
+    // next();
+    // return;
     request.put({
       url: 'http://localhost:9200/procurment/tender/' + obj.id,
       body: obj

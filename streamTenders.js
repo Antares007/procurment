@@ -14,49 +14,32 @@ module.exports = async function(session) {
   var con = net.connect(3000);
   con.pipe(db.createRpcStream()).pipe(con);
 
-  var postForm = require('./denodeify.js')(session.postForm);
   var get = require('./denodeify.js')(session.get);
   var dbGet = require('./denodeify.js')(db.get.bind(db));
   var dbPut = require('./denodeify.js')(db.put.bind(db));
   var dbBatch = require('./denodeify.js')(db.batch.bind(db));
 
-  var searchForm = {
-    action:'search_app', search:'', app_reg_id:'', app_shems_id:'0', org_a:'',
-    app_monac_id:'0', org_b:'', app_status:'0', app_agr_status:'0', app_type:'0',
-    app_t:'0', app_basecode:'0', app_codes:'',
-    app_date_type:'1',
-    app_date_from: argv.from,
-    app_date_tlll: argv.to,
-    app_amount_from:'', app_amount_to:'', app_pricelist:'0', app_manufacturer_id:'0',
-    app_manufacturer:'', app_model_id:'0', app_model:'', app_currency:'2'
-  };
-  await postForm('https://tenders.procurement.gov.ge/engine/controller.php', searchForm)
 
-  var i = 1;
   var k = 0;
-  session.stream(
-    'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=' + i,
-    function(prevUrl, body) {
-      i++;
-      return 'https://tenders.procurement.gov.ge/engine/controller.php?action=search_app&page=' + i;
-    },
-    function(body) {
-      var list = require('./parseTenderListPage.js')(body);
-      return list.length > 0 ? list : null;
+  var from = parseInt(argv.from);
+  var to = parseInt(argv.to);
+
+  new require('stream').Readable({
+    objectMode: true,
+    read: function(){
+      this.push(from);
+      from = from + 1;
+      if(from >= to) {
+        this.push(null);
+      }
     }
-  ).pipe(
-    transform(function(ids, next){
-      ids.forEach(id => this.push(id));
-      next();
-    })
-  ).pipe(
+  }).pipe(
     asyncTransform(async function(tenderId){
 
       var tenderKey = 'tender!' + tenderId;
       try{
         await dbGet(tenderKey);
-        return tenderKey;
-
+        return tenderKey + ' ok';
       } catch(err) {
         if(err.notFound) {
           var makePageUrl = (action) =>
@@ -73,24 +56,17 @@ module.exports = async function(session) {
 
           var pages = await Promise.all(promisedPages);
 
-          var mainJson = require('./parseTenderMainPage.js')(pages[0].body);
-
           await dbBatch(
             pages
               .map(p => ({ type: 'put', key: p.url, value: p.body }))
               .concat({ type: 'put', key: 'tender!' + tenderId, value: 'n/a' })
           );
 
-          return {
-            id: tenderId,
-            appDate: mainJson['ტენდერის გამოცხადების თარიღი'],
-            status: mainJson['ტენდერის სტატუსი'],
-          };
+          return tenderKey;
         } else {
           throw err;
         }
       }
-
     })
   ).pipe(
     transform(function(x, next){
