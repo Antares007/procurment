@@ -44,9 +44,11 @@ level('./parsedDb', {
   })
 ).pipe(
   transform(function(obj, next){
-    // console.log(obj);
-    // next();
-    // return;
+    var cvp = obj.app_main['კლასიფიკატორის  (CPV) კოდი და  კლასიფიკატორის დანაყოფი'];
+    if((cvp ? cvp.length : 0) > 1)
+    console.log(obj);
+    next();
+    return;
     request.put({
       url: 'http://localhost:9200/procurment/tender/' + obj.id,
       body: obj

@@ -1,10 +1,10 @@
-#!/usr/bin/env iojs
-require('babel/register')({
-  whitelist: [
-    'asyncToGenerator',
-    'es6'
-  ]
-});
+#!/usr/bin/env babel-node
+// require('babel/register')({
+//   whitelist: [
+//     'asyncToGenerator',
+//     'es6'
+//   ]
+// });
 var argv = require('yargs')
   .usage('Usage: $0 -user [userName] -pass [password]')
   .demand(['user','pass'])

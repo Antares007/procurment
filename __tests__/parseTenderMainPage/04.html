@@ -28,7 +28,7 @@
 	</tr>
 	<tr>
 		<td>ტენდერის სტატუსი</td>
-		<td valign="middle"><img src="images/statuses/stat30.png"> წინადადებების მიღება დასრულებულია</td>
+		<td valign="middle"><img src="images/statuses/stat50.png"> გამარჯვებული გამოვლენილია</td>
 	</tr>
 	<tr>
 		<td>შემსყიდველი</td>
@@ -74,7 +74,7 @@
 		<td colspan="2">
 			<div style="text-align:left;color:#222">
 			<ul style="margin:0 0 0 8px;padding:6px;list-style-type:disc;">
-				<li style="padding:4px">&nbspnbsp;30100000 - საოფისე მანქანა-დანადგარები, აღჭურვილობა და საკანცელარიო ნივთები, კომპიუტერების, პრინტერებისა და ავეჯის გარდა</li>
+				<li style="padding:4px">&nbsp;30100000 - საოფისე მანქანა-დანადგარები, აღჭურვილობა და საკანცელარიო ნივთები, კომპიუტერების, პრინტერებისა და ავეჯის გარდა</li>
 			</ul>
 			</div>
 		</td>
@@ -207,7 +207,7 @@ $(document).ready(function() {
             action: 'favorite',
             app_id: h[1]
         }, function(res){
-            $.get('engine/controller.php', {action:'search_apps', page:'current'}, function(res){$('#app_list').html(res);$('#A'+h[1]).addClass('hover')});
+            $.get('engine/controller.php', {action:'lastevents', page:'current'}, function(res){$('#app_list').html(res);$('#A'+h[1]).addClass('hover')});
         })
 	});
 

@@ -51,9 +51,8 @@ var valueParsers = {
       return $(this).text().trim();
     }).get();
   },
-  'დამატებითი ინფორმაცია': function(td){
-    var value = td.text().trim();
-    if(value === '') return;
+  'დამატებითი ინფორმაცია': function(td, i){
+    if(i < 1) return null;
     return td.text().trim();
   },
   'შესყიდვის რაოდენობა ან მოცულობა': textTrim,
@@ -80,9 +79,13 @@ var valueParsers = {
   'დონორი': textTrim,
   'ერთეულის სავარაუდო ღირებულება': function(td){
     return parseAmount(textTrim(td));
-  },
+  }
 };
-
+var tokens = {
+  start: 1,
+  key: 2,
+  value: 3
+};
 module.exports = function(htmlStr) {
   var $ = cheerio.load(htmlStr);
   return $('table').filter(function() {
@@ -92,17 +95,34 @@ module.exports = function(htmlStr) {
   .map(function(){ return $(this); })
   .get()
   .reduce(function(state, td){
-    var maybeKey = td.text().trim();
-    // console.log(maybeKey);
-    if(valueParsers.hasOwnProperty(maybeKey)){
-      state.parserKey = maybeKey;
-    } else {
-      var rez = valueParsers[state.parserKey](td);
-      if(typeof rez !== 'undefined'){
-        state.rez[state.parserKey] = rez;
-        state.parserKey = null;
+    var prevToken = state.token;
+    if(prevToken === tokens.value || prevToken === tokens.start){
+      var key = td.text().trim();
+      if(!key){
+        return state;
       }
+      if(!valueParsers.hasOwnProperty(key)){
+        throw new Error('parser not definded for key:' + key);
+      }
+      state.token = tokens.key
+      state.key = key;
+      state.i = 0;
+    } else if(prevToken === tokens.key){
+      var parser = valueParsers[state.key];
+      try{
+        var rez = parser(td, state.i++);
+        if(rez === null) {
+          return state;
+        }
+        state.rez[state.key] = rez;
+        state.token = tokens.value;
+        state.key = null;
+      } catch(err) {
+        throw new Error('cant parse value for key:' + state.key);
+      }
+    } else {
+      throw new Error('invalid token! ' + prevToken);
     }
     return state;
-  }, { rez:{} }).rez;
+  }, { rez:{}, token: tokens.start }).rez;
 };
