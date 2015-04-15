@@ -74,7 +74,7 @@ module.exports = function(htmlStr) {
             'დაწყება': tds.eq(0).text(),
             'დამთავრება': tds.eq(1).text(),
             'პრეტენდენტი': tds.eq(2).text(),
-            'თანხა': parseAmount(tds.eq(3).text())
+            'თანხა': parseAmount(tds.eq(3).text()).amount
           };
         }).get();
         return {type: text, table: table};

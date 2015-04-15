@@ -36,7 +36,7 @@ var valueParsers = {
   'დაფინანსების წყარო': textTrim,
   'შესყიდვის სავარაუდო ღირებულება': function(td){
     return {
-      'თანხა': parseAmount(td.find('span').first().text().trim()),
+      'თანხა': parseAmount(td.find('span').first().text().trim()).amount,
       'შენიშვნა': td.find('span').first().next().text().trim()
     };
   },
@@ -60,25 +60,25 @@ var valueParsers = {
     return td.text().trim();
   },
   'შეთავაზების ფასის კლების ბიჯი': function(td){
-    return parseAmount(textTrim(td));
+    return parseAmount(textTrim(td)).amount;
   },
   'გარანტიის ოდენობა': function(td){
-    return parseAmount(textTrim(td));
+    return parseAmount(textTrim(td)).amount;
   },
   'გარანტიის მოქმედების ვადა': textTrim,
 
   'პრეისკურანტის სავარაუდო ღირებულება': function(td){
-    return parseAmount(textTrim(td));
+    return parseAmount(textTrim(td)).amount;
   },
   'შესყიდვის ობიექტის სახელშეკრულებო ღირებულება': function(td){
     return {
-      'თანხა': parseAmount(td.find('span').first().text().trim()),
+      'თანხა': parseAmount(td.find('span').first().text().trim()).amount,
       'შენიშვნა': td.find('span').first().next().text().trim()
     };
   },
   'დონორი': textTrim,
   'ერთეულის სავარაუდო ღირებულება': function(td){
-    return parseAmount(textTrim(td));
+    return parseAmount(textTrim(td)).amount;
   }
 };
 var tokens = {
