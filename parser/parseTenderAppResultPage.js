@@ -14,6 +14,7 @@ module.exports = function(htmlStr) {
       .find('tbody tr')
       .map(function(){
         var tds = $(this).children();
+        if(tds.length === 1) return;
         var dateAndAuthor = tds.eq(3).text().split('::');
         return {
           href: tds.eq(2).find('a').attr('href'),
