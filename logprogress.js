@@ -16,7 +16,9 @@ module.exports = function logProgress(step, fn){
     this.push(x);
     next();
   }, function(done){
-    debug(fn(lastx, i));
+    if(i % step !== 0){
+      debug(fn(lastx, i));
+    }
     done();
   });
 }
