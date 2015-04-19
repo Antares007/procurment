@@ -55,10 +55,12 @@ module.exports = function(recordsDb){
       }
 
       function createReadStream(opt){
+        opt = opt || {};
         var readable = recordsDb.createReadStream({
-          gte: opts.keyEncoding.encode(opt.from || 0),
+          gte: opts.keyEncoding.encode(opt && opt.from ? opt.from : 0),
           lte: opts.keyEncoding.encode(99999999999),
           limit: opt.limit,
+          reverse: opt.reverse,
           keyEncoding: opts.keyEncoding,
           valueEncoding: opts.valueEncoding
         });
