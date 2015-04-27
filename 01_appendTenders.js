@@ -49,7 +49,7 @@ var main = async function(){
   )
   .on('error', defer.reject.bind(defer))
   .pipe(
-    require('./logprogress.js')(1000, (d, i) => i + '\t' + d.tenderId + '\t' + d.pages.join('').length)
+    require('./logprogress.js')(1, (d, i) => i + '\t' + d.tenderId + '\t' + d.pages.join('').length)
   )
   .on('error', defer.reject.bind(defer))
   .pipe(
