@@ -1,38 +1,19 @@
-var split = require('split');
-var equal = require('deep-equal');
-var logProgress = require('./logprogress.js');
-var fs = require('fs');
-var path = require('path');
-var mkdirp = require('mkdirp');
 var parsers = require('./parser');
-
 
 module.exports = function(oldRoot, newRoot, oldTree) {
 
-  oldRoot
-    .diff(newRoot)
-    .filter(x => x.path.indexOf('s/140/444') > 0)
-    .map(async function(patch){
-      return {
-        s: patch.status,
-        p: patch.path,
-        n: parseTender(await patch.newContent()),
-        o: patch.status === 'M' ? parseTender(await patch.oldContent()) : undefined
-      };
-    })
-    .filter(x => !equal(x.n, x.o))
+  var tendersPatch = oldRoot.get('tenders', new Tree()).diff(newRoot.get('tenders'))
 
+  var oldParsedTendersTree = oldTree.get('parsedTenders', new Tree());
 
-    .valueOf()
-    .pipe(logProgress(100))
-    .on('data', function(data){
+  var newParsedTendersTree = tendersPatch.map(parseTender).apply(oldParsedTendersTree);
 
-    });
+  var newTree = oldTree.set('parsedTenders', newParsedTendersTree);
 
-  return;
+  return newTree;
 
-  function parseTender(content){
-    var pages = content.toString().split(String.fromCharCode(0));
+  function parseTender(buffer){
+    var pages = buffer.toString('utf8').split(String.fromCharCode(0));
     try {
       return {
         app_main: parsers.app_main(pages[0]),
