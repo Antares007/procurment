@@ -1,4 +1,3 @@
-var tesli = require('./03_.js');
 var debug = require('debug')('tesliRunner');
 var transform = require('./transform.js');
 var mygit = require('./mygit.js');
@@ -25,26 +24,7 @@ git.openIndex = function(path) {
     writeTree: denodeify(index.writeTree),
     createUpdateIndexInfoStream: index.createUpdateIndexInfoStream
   }
-}
-
-
-// var index = git.openIndex('testIndex');
-// index.readTree('c88ca5253b54dcc6f8190f187fc7ed001bfce0fb')
-//   .then(function(){
-//     var s = index.createUpdateIndexInfoStream()
-//       .on('finish', function(){
-//         index.writeTree().then(function(sha){
-//           console.log(sha);
-//           git.lsTree(sha).then(console.log.bind(console))
-//         });
-//       })
-//     s.write('0 0000000000000000000000000000000000000000\t706.zsv\n');
-//     s.write('0 0000000000000000000000000000000000000000\t707.zsv\n');
-//     s.write('0 0000000000000000000000000000000000000000\t708.zsv\n');
-//     s.write('100644 blob c7d16995a44f6e7538ab4bd401543fdbda3e723b\tმაშა მაშა\n');
-//     s.end();
-//   });
-// return;  
+};
 
 var emptyTreeSha = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
@@ -140,7 +120,8 @@ class Patch {
           return index.readTree(treeSha).then(function(){
             var indexInfo = index.createUpdateIndexInfoStream()
                         .on('error', err => defer.reject(err))
-                        .on('finish', () => defer.resolve());
+                        .on('finish', () => setTimeout(() => defer.resolve(), 1000)); // TODO: after finish index is still locked
+                        
             patchsStream
               .map(function(p){
                 var { path, status, newSha, mode } = p;
@@ -150,23 +131,28 @@ class Patch {
                   return `0 0000000000000000000000000000000000000000\t${path}\n`;
                 }
               })
-              .pipe(require('./logprogress.js')(100))
+              .pipe(require('./logprogress.js')(1000))
               .valueOf()
               .on('error', err => defer.reject(err))
               .pipe(indexInfo)
 
-            return defer.promise.then(() => index.writeTree());
-          });
+            return defer.promise;
+          })
+          .then(() => index.writeTree());
         })
     );
   }
 }
 
+var tesli = require('./03_.js');
+
 var rez = tesli(
   new Tree(),
   new Tree('38f5e5fa6f33cac790c29650bead4f88905b2abb'),
   new Tree()
-).sha.then(function(sha){
+);
+
+rez.sha.then(function(sha){
   console.log(sha);
   catFileBatch.end();
 }).catch(function(err){
@@ -174,5 +160,3 @@ var rez = tesli(
   console.log(err.stack);
   catFileBatch.end();
 });
-
-debug(rez);
