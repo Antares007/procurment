@@ -10,8 +10,11 @@ module.exports = function gitStreamer(gitDir) {
   var git = function (cmd, mappers, options, cb) {
     if(typeof options === 'function') {
       cb = options;
-      options = { encoding: 'utf8', timeout: 0, maxBuffer: 100*1024, killSignal: 'SIGTERM' };
+      options = {
+        encoding: 'utf8', timeout: 0, maxBuffer: 1000*1024, killSignal: 'SIGTERM'
+      };
     }
+
     return exec(gitCmdBase + cmd, options, function(err, stdout) {
       if(err) {
         cb(err);
@@ -20,10 +23,10 @@ module.exports = function gitStreamer(gitDir) {
       }
     });
   };
-  var spawn = function(args){
+  var spawn = function(args, options){
     var spawn = require('child_process').spawn;
     var args2 = [`--git-dir=${gitDir}`].concat(args);
-    return spawn('git', args2);
+    return spawn('git', args2, options);
   }
 
   var mappers = {
@@ -45,15 +48,63 @@ module.exports = function gitStreamer(gitDir) {
     exec: git,
     spawn: spawn,
     mappers: mappers,
+    revParse: function(rev, cb){
+      git('rev-parse ' + rev, [mappers.trimOutput], cb);
+    },
+    openIndex: function(path){
+      var options = {env: { GIT_INDEX_FILE: path }};
+      return {
+        readTree: function(sha, cb){
+          git('read-tree ' + sha, [], options, cb);
+        },
+        writeTree: function(cb) {
+          git('write-tree', [mappers.trimOutput], options, cb);
+        },
+        createUpdateIndexInfoStream: function(){
+
+          var child = spawn(['update-index', '--index-info'], options);
+
+          child.stdout.on('data', function(data){
+            console.log(data);
+          })
+          child.stderr.on('data', function(data){
+            console.log(data);
+          })
+          return child.stdin;
+        }
+      }
+    },
     diffTree: function(tree1, tree2){
-      var child = spawn(['diff-tree', '--raw', '-r', tree1, tree2]);
-      return new AStream(child.stdout.pipe(split()))
+      return new AStream(() => spawn(['diff-tree', '--raw', '-r', tree1, tree2]).stdout)
+        .pipe(split())
         .transform(function(x, n){
           if(x){
             this.push(mappers.parseDiffLine(x.toString()));
           }
           n();
         });
+    },
+    lsTree: function(sha, cb) {
+      git(
+        'ls-tree ' + sha,
+        [x => x.split('\n').reduce((tree, line) => {
+          if(!line){
+            return tree;
+          }
+          var [rest, name] = line.split('\t');
+          var [mode, type, sha] = rest.split(' ');
+          tree[name] = {mode, type, sha};
+          return tree;
+        }, {})],
+        cb
+      );
+    },
+    mktree: function(tree, cb) {
+      var data = Object.keys(tree).map(name => {
+        var e = tree[name];
+        return `${e.mode} ${e.type} ${e.sha}\t${name}`;
+      }).join('\n');
+      git('mktree --missing', [mappers.trimOutput], cb).stdin.end(data, 'utf8');
     },
     getBlob: function(sha, cb) {
       var self = this;
@@ -67,19 +118,9 @@ module.exports = function gitStreamer(gitDir) {
     hashObject: function(buffer, cb) {
       git(
         'hash-object --stdin -t blob -w',
-        [git.mappers.trimOutput],
+        [mappers.trimOutput],
         cb
       ).stdin.end(buffer);
-    },
-    makeTree: function(entries, cb) {
-      var data = entries.map(x => (
-        (x.type === 'tree' ? '040000 tree' : '100644 blob') + ' ' + x.sha + '\t' + x.name
-      )).join('\n');
-      git(
-        'mktree --missing',
-        [git.mappers.trimOutput],
-        cb
-      ).stdin.end(data, 'utf8');
     },
     catFileBatch: function(){
       var cbs = [];

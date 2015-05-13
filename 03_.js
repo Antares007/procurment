@@ -2,11 +2,21 @@ var parsers = require('./parser');
 
 module.exports = function(oldRoot, newRoot, oldTree) {
 
-  var tendersPatch = oldRoot.get('tenders', new Tree()).diff(newRoot.get('tenders'))
+  var oldTendersRoot = !oldRoot.isEmpty ? oldRoot.cd('tenders') : oldRoot;
+  var newTendersRoot = newRoot.cd('tenders');
 
-  var oldParsedTendersTree = oldTree.get('parsedTenders', new Tree());
+  var tendersPatch = oldTendersRoot.diff(newTendersRoot);
 
-  var newParsedTendersTree = tendersPatch.map(parseTender).apply(oldParsedTendersTree);
+  var oldParsedTendersTree = !oldTree.isEmpty ? oldTree.cd('parsedTenders') : oldTree;
+
+  var newParsedTendersTree = tendersPatch
+    .filter(p => p.path.indexOf('140/') === 0)
+    .map(function(key, buffer){
+      var tender = parseTender(buffer);
+      var id = parseInt(key.split(/\/|\./).splice(1, 3).join(''), 10);
+      this.emit(id.toString(), tender);
+    })
+    .apply(oldParsedTendersTree);
 
   var newTree = oldTree.set('parsedTenders', newParsedTendersTree);
 
