@@ -65,10 +65,10 @@ module.exports = function gitStreamer(gitDir) {
           var child = spawn(['update-index', '--index-info'], options);
 
           child.stdout.on('data', function(data){
-            console.log(data);
+            console.log('uiis stdout', data);
           })
           child.stderr.on('data', function(data){
-            console.log(data);
+            console.log('uiis stderr', data.toString());
           })
           return child.stdin;
         }
@@ -208,8 +208,10 @@ function exec(str, opt, cb) {
     str,
     opt,
     function (error, stdout, stderr) {
-      if (error !== null || stderr) {
-        cb({ error: error, stderr: stderr });
+      if (error) {
+        return cb(error);
+      } else if(stderr) {
+        return cb(new Error(stderr));
       } else {
         cb(null, stdout);
       }

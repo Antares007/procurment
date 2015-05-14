@@ -1,27 +1,44 @@
+var { Tree } = require('./tesli.js');
 var parsers = require('./parser');
 
-module.exports = function(oldRoot, newRoot, oldTree) {
+module.exports = function(oldRoot, newRoot) {
 
-  var oldTendersRoot = !oldRoot.isEmpty ? oldRoot.cd('tenders') : oldRoot;
-  var newTendersRoot = newRoot.cd('tenders');
+  var oldTenders = this.parsedTenders || new Tree();
 
-  var tendersPatch = oldTendersRoot.diff(newTendersRoot);
+  var newTenders = oldRoot.get('tenders', new Tree())
+    .diff(newRoot.get('tenders'))
+    .filter(p => p.path.indexOf('001/70') === 0)
+    .map(mapTender)
+    .apply(oldTenders);
 
-  var oldParsedTendersTree = !oldTree.isEmpty ? oldTree.cd('parsedTenders') : oldTree;
+  this.parsedTenders = newTenders;
 
-  var newParsedTendersTree = tendersPatch
-    .filter(p => p.path.indexOf('140/') === 0)
-    .map(function(key, buffer){
-      var tender = parseTender(buffer);
-      var id = parseInt(key.split(/\/|\./).splice(1, 3).join(''), 10);
-      this.emit(id.toString(), tender);
-    })
-    .apply(oldParsedTendersTree);
+  // var diffTree = oldParsedTendersTree
+  //   .diff(newParsedTendersTree)
+  //   .map(function(key, buffer){
+  //     var tender = JSON.parse(buffer.toString());
+  //     this.emit((tender.app_main || { 'ტენდერის სტატუსი': 'შეცდომა' })['ტენდერის სტატუსი'], 1);
+  //   })
+  //   .apply(oldTree)
+  //   .checkout(function(){
+  //     var self = this;
+  //     this.ავოე1 = this['ხელშეკრულება დადებულია'].checkout(function(){
+  //       this.sopikuna = self['ხელშეკრულება დადებულია'].checkout(function(){
+  //         this.achikuna = self['ხელშეკრულება დადებულია'];
+  //       });
+  //     });
+  //     this.ავოე2 = this['ხელშეკრულება დადებულია'];
+  //     this.ავოე3 = this['ხელშეკრულება დადებულია'];
+  //     this.ავოე4 = this['ხელშეკრულება დადებულია'];
+  //   });
 
-  var newTree = oldTree.set('parsedTenders', newParsedTendersTree);
 
-  return newTree;
 
+  function mapTender(key, buffer){
+    var tender = parseTender(buffer);
+    var id = parseInt(key.split(/\/|\./).splice(0, 2).join(''), 10);
+    this.emit(id.toString(), tender);
+  }
   function parseTender(buffer){
     var pages = buffer.toString('utf8').split(String.fromCharCode(0));
     try {
