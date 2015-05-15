@@ -31,41 +31,31 @@ export class Tree {
     });
   }
 
-  set(path, other){
-    return new Tree(async (git) => {
-      var thisTreeSha = await this.getSha(git);
-      var otherTreeSha = await other.getSha(git);
-      var entries = await git.lsTree(thisTreeSha);
-      entries[path] = { mode: '040000', type: 'tree', sha: otherTreeSha };
-      return await git.mktree(entries);
-    });
-  }
-
   diff(other){
-    return new Diff(async (git) => {
-      var oldTreeSha = await this.getSha(git);
-      var newTreeSha = await other.getSha(git);
-      return git.diffTree(oldTreeSha, newTreeSha);
-    });
+    return new Diff(async (git) => git.diffTree(await this.getSha(git), await other.getSha(git)));
   }
 
   cd(fn){
     var self = this;
     return new Tree(async (git) => {
-      var sha = await this.getSha(git);
-      var entries = await git.lsTree(sha);
+      var tree = (await git.lsTree(await this.getSha(git))).reduce(function(tree, entry){
+        tree[entry.name] = entry.type === 'tree' ? new Tree(entry.sha) : new Blob(entry.sha);
+        return tree;
+      }, {});
 
-      Object.keys(entries)
-        .forEach(function(key){
-          var entry = entries[key];
-          entries[key] = entry.type === 'tree' ? new Tree(entry.sha) : new Blob(entry.sha);
-        });
+      fn.call(tree, tree);
 
-      fn.call(entries, entries);
-
-      entries = await Promise.all(Object.keys(entries).map(key => entries[key].getEntry(key)(git)));
-
-      return await git.mktree(entries.reduce((t, x) => (t[x.name] = x, t), {}));
+      return await git.mktree(
+        await Promise.all(
+          Object.keys(tree).map(async function(name){
+            var e = tree[name];
+            var type = e instanceof Tree ? 'tree' : 'blob';
+            var mode = e instanceof Tree ? '040000' : '100644';
+            var sha = await e.getSha(git);
+            return { mode, type, sha, name };
+          })
+        )
+      );
     });
   }
 
@@ -74,20 +64,15 @@ export class Tree {
     return new Blob(async (git) => {
       var sha = await this.getSha(git);
       var entries = await git.lsTree(sha);
-      var byType = Object.keys(entries)
-        .reduce((s, key) => (s[entries[key].type].push(entries[key].sha), s), { tree:[], blob:[] });
 
-      var shas = await Promise.all(byType.tree.map(x => new Tree(x).reduce(fn).getSha(git)));
-      var buffers = await Promise.all(shas.concat(byType.blob).map(x => git.cat(x)));
+      var shas = await Promise.all(
+        entries.map(x => x.type === 'tree' ? new Tree(x.sha).reduce(fn).getSha(git) : x.sha)
+      );
+
+      var buffers = await Promise.all(shas.map(x => git.cat(x)));
       var blobSha = await git.hashObject(fn(buffers));
-
+      console.log('reduced');
       return blobSha;
-    });
-  }
-
-  getEntry(name){
-    return git => this.getSha(git).then(function(sha){
-      return { mode: '040000', type: 'tree', sha: sha, name: name };
     });
   }
 }
@@ -106,12 +91,6 @@ class Blob {
       return this.promisedSha;
     this.promisedSha = this.shaFn(git);
     return this.promisedSha;
-  }
-
-  getEntry(name){
-    return (git) => this.getSha(git).then(function(sha){
-      return { mode: '100644', type: 'blob', sha: sha, name: name };
-    });
   }
 }
 

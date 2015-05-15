@@ -87,23 +87,16 @@ module.exports = function gitStreamer(gitDir) {
     lsTree: function(sha, cb) {
       git(
         'ls-tree ' + sha,
-        [x => x.split('\n').reduce((tree, line) => {
-          if(!line){
-            return tree;
-          }
+        [x => x.split('\n').filter(l => l).map((line) => {
           var [rest, name] = line.split('\t');
           var [mode, type, sha] = rest.split(' ');
-          tree[name] = {mode, type, sha};
-          return tree;
-        }, {})],
+          return {mode, type, sha, name};
+        })],
         cb
       );
     },
-    mktree: function(tree, cb) {
-      var data = Object.keys(tree).map(name => {
-        var e = tree[name];
-        return `${e.mode} ${e.type} ${e.sha}\t${name}`;
-      }).join('\n');
+    mktree: function(entries, cb) {
+      var data = entries.map(e => `${e.mode} ${e.type} ${e.sha}\t${e.name}`).join('\n');
       git('mktree --missing', [mappers.trimOutput], cb).stdin.end(data, 'utf8');
     },
     getBlob: function(sha, cb) {

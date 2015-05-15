@@ -9,9 +9,6 @@ module.exports = function(oldRoot, newRoot) {
     .diff(newRoot.get('tenders'))
     .filter(p => p.path.indexOf('001/7') === 0)
     .map(mapTender)
-    // .transform(function(patch){
-    //   return patch.
-    // })
     .apply(oldTenders);
 
   var delta = oldTenders
@@ -42,7 +39,6 @@ module.exports = function(oldRoot, newRoot) {
 
   function mapStatuses(key, buffer){
     var id = parseInt(key.split('/')[0], 10);
-    console.log(id);
     var tender = JSON.parse(buffer.toString());
     this.emit((tender.app_main || { 'ტენდერის სტატუსი': 'შეცდომა' })['ტენდერის სტატუსი'], [id]);
   }
