@@ -13,7 +13,7 @@ export class Tree {
   getSha(git){
     if(this.promisedSha)
       return this.promisedSha;
-    return this.promisedSha = this.shaFn(git); 
+    return this.promisedSha = this.shaFn(git);
   }
 
   get(path, nullValue){
@@ -42,7 +42,7 @@ export class Tree {
   }
 
   diff(other){
-    return new Patch(async (git) => {
+    return new Diff(async (git) => {
       var oldTreeSha = await this.getSha(git);
       var newTreeSha = await other.getSha(git);
       return git.diffTree(oldTreeSha, newTreeSha);
@@ -68,7 +68,7 @@ export class Tree {
       return await git.mktree(entries.reduce((t, x) => (t[x.name] = x, t), {}));
     });
   }
-  
+
   getEntry(name){
     return git => this.getSha(git).then(function(sha){
       return { mode: '040000', type: 'tree', sha: sha, name: name };
@@ -89,7 +89,7 @@ class Blob {
     if(this.promisedSha)
       return this.promisedSha;
     this.promisedSha = this.shaFn(git);
-    return this.promisedSha; 
+    return this.promisedSha;
   }
 
   getEntry(name){
@@ -99,19 +99,19 @@ class Blob {
   }
 }
 
-class Patch {
+class Diff {
   constructor(promisedAStream){
     this.promisedAStream = promisedAStream;
   }
   filter(filter){
-    return new Patch(git =>
+    return new Diff(git =>
       this.promisedAStream(git).then(function(astream){
         return astream.filter(filter);
       })
     );
   }
   map(mapFunction){
-    return new Patch(async (git) => {
+    return new Diff(async (git) => {
       var astream = await this.promisedAStream(git);
       return astream
         .transform(function(p, next){
@@ -132,7 +132,13 @@ class Patch {
           for(var i in emitedValues){
             var emited = emitedValues[i];
             var sha = await git.hashObject(new Buffer(JSON.stringify(emited.value), 'utf8'));
-            ds.push({ path: emited.key + '/' + p.path, status: p.status, sha, mode: '100644' });
+            var blobName = hash(p.path + '/' + i);
+            ds.push({
+              path: emited.key + '/' + blobName,
+              status: p.status,
+              sha,
+              mode: '100644'
+            });
           }
           return ds;
         })
@@ -147,19 +153,35 @@ class Patch {
     });
   }
 
+  toTree(){
+    return new Tree(async (git) => {
+      var patchsStream = await this.promisedAStream(git);
+
+      var index = git.openIndex('testIndex2');
+
+      await index.readTree(await new Tree().getSha(git));
+
+      await patchsStream
+        .map(function(p){
+          var { path, status, newSha, mode } = p;
+          return `${mode} ${newSha}\t${status}/${path}\n`
+        })
+        .pipe(require('./logprogress.js')(10))
+        .writeTo(index.createUpdateIndexInfoStream());
+
+      return await index.writeTree();
+    });
+  }
+
   apply(tree){
     return new Tree(async (git) => {
       var patchsStream = await this.promisedAStream(git);
+
       var index = git.openIndex('testIndex2');
-      var defer = Promise.defer();
 
       await index.readTree(await tree.getSha(git));
-      var indexInfo = index.createUpdateIndexInfoStream()
-        .on('error', err => defer.reject(err))
-        .on('finish', () => setTimeout(() => defer.resolve(), 1000));
-        // TODO: after finish index is still locked. wait process to exit
-                  
-      patchsStream
+
+      await patchsStream
         .map(function(p){
           var { path, status, newSha, mode } = p;
           if(status === 'A'){
@@ -169,12 +191,16 @@ class Patch {
           }
         })
         .pipe(require('./logprogress.js')(10))
-        .valueOf()
-        .on('error', err => defer.reject(err))
-        .pipe(indexInfo)
+        .writeTo(index.createUpdateIndexInfoStream());
 
-      await defer.promise;
       return await index.writeTree();
     });
   }
+}
+
+var crypto = require('crypto');
+function hash(value){
+  var shasum = crypto.createHash('sha1');
+  shasum.update(value.toString());
+  return shasum.digest('hex');
 }

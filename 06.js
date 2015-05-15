@@ -38,7 +38,7 @@ var newTree = oldTree.cd(function(oldTreeDir){
 
 
 newTree.getSha(git).then(function(sha){
-  console.log('done', sha);
+  console.log(sha);
   catFileBatch.end();
 }).catch(function(err){
   console.log('err', err);

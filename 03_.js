@@ -11,34 +11,30 @@ module.exports = function(oldRoot, newRoot) {
     .map(mapTender)
     .apply(oldTenders);
 
+  var delta = oldTenders
+    .diff(newTenders)
+    .map(mapStatuses)
+    .toTree();
+
+  this.ტენდერებისტატუსებისმიხედვით = (this.ტენდერებისტატუსებისმიხედვით || new Tree())
+    .cd(function(){
+      this.delta = delta;
+    });
+
   this.parsedTenders = newTenders;
 
-  // var diffTree = oldParsedTendersTree
-  //   .diff(newParsedTendersTree)
-  //   .map(function(key, buffer){
-  //     var tender = JSON.parse(buffer.toString());
-  //     this.emit((tender.app_main || { 'ტენდერის სტატუსი': 'შეცდომა' })['ტენდერის სტატუსი'], 1);
-  //   })
-  //   .apply(oldTree)
-  //   .checkout(function(){
-  //     var self = this;
-  //     this.ავოე1 = this['ხელშეკრულება დადებულია'].checkout(function(){
-  //       this.sopikuna = self['ხელშეკრულება დადებულია'].checkout(function(){
-  //         this.achikuna = self['ხელშეკრულება დადებულია'];
-  //       });
-  //     });
-  //     this.ავოე2 = this['ხელშეკრულება დადებულია'];
-  //     this.ავოე3 = this['ხელშეკრულება დადებულია'];
-  //     this.ავოე4 = this['ხელშეკრულება დადებულია'];
-  //   });
-
-
+  function mapStatuses(key, buffer){
+   var tender = JSON.parse(buffer.toString());
+    this.emit((tender.app_main || { 'ტენდერის სტატუსი': 'შეცდომა' })['ტენდერის სტატუსი'], 1);
+    this.emit((tender.app_main || { 'ტენდერის სტატუსი': 'შეცდომა' })['ტენდერის სტატუსი'], 2);
+  }
 
   function mapTender(key, buffer){
     var tender = parseTender(buffer);
     var id = parseInt(key.split(/\/|\./).splice(0, 2).join(''), 10);
     this.emit(id.toString(), tender);
   }
+
   function parseTender(buffer){
     var pages = buffer.toString('utf8').split(String.fromCharCode(0));
     try {

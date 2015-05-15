@@ -18,6 +18,17 @@ export class AStream {
     return this.readableStreamFactory();
   }
 
+  writeTo(writable){
+    var defer = Promise.defer();
+    this.valueOf()
+      .on('error', err => defer.reject(err))
+      .pipe(writable)
+      .on('error', err => defer.reject(err))
+      .on('finish', () => setTimeout(() => defer.resolve(), 1000));
+      // TODO: after finish index is still locked. wait process to exit
+    return defer.promise;
+  }
+
   pipe(stream){
     return new AStream(() => pipe(
       this.readableStreamFactory(),
