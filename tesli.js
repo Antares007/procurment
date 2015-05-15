@@ -69,6 +69,22 @@ export class Tree {
     });
   }
 
+  reduce(fn){
+    var self = this;
+    return new Blob(async (git) => {
+      var sha = await this.getSha(git);
+      var entries = await git.lsTree(sha);
+      var byType = Object.keys(entries)
+        .reduce((s, key) => (s[entries[key].type].push(entries[key].sha), s), { tree:[], blob:[] });
+
+      var shas = await Promise.all(byType.tree.map(x => new Tree(x).reduce(fn).getSha(git)));
+      var buffers = await Promise.all(shas.concat(byType.blob).map(x => git.cat(x)));
+      var blobSha = await git.hashObject(fn(buffers));
+
+      return blobSha;
+    });
+  }
+
   getEntry(name){
     return git => this.getSha(git).then(function(sha){
       return { mode: '040000', type: 'tree', sha: sha, name: name };
