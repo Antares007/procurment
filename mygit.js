@@ -11,7 +11,7 @@ module.exports = function gitStreamer(gitDir) {
     if(typeof options === 'function') {
       cb = options;
       options = {
-        encoding: 'utf8', timeout: 0, maxBuffer: 1000*1024, killSignal: 'SIGTERM'
+        encoding: 'utf8', timeout: 0, maxBuffer: 1024*1024*1024, killSignal: 'SIGTERM'
       };
     }
 
