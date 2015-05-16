@@ -1,4 +1,5 @@
 var emptyTreeSha = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+var debug = require('debug')('tesli');
 
 export class Tree {
   constructor(shaFn = (git) => Promise.resolve(emptyTreeSha)){
@@ -63,6 +64,7 @@ export class Tree {
     var self = this;
     return new Blob(async (git) => {
       var sha = await this.getSha(git);
+      debug('reduceing: ' + sha);
       var entries = await git.lsTree(sha);
 
       var shas = await Promise.all(
@@ -71,7 +73,7 @@ export class Tree {
 
       var buffers = await Promise.all(shas.map(x => git.cat(x)));
       var blobSha = await git.hashObject(fn(buffers));
-      console.log('reduced');
+      debug('rediced: ' + sha +' -> ' + blobSha);
       return blobSha;
     });
   }
