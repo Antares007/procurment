@@ -1,40 +1,51 @@
-var { Tree } = require('./tesli.js');
+var { Tree, Blob } = require('./tesli.js');
 var parsers = require('./parser');
 
 module.exports = function(oldRoot, newRoot) {
+
+  this.treeFromBlob = Blob.of(['a','v','i'])
+    .toTree(function(buffer){
+      var list = JSON.parse(buffer.toString());
+      list.forEach(x => this.emit('avi/' + x, new Buffer(x)));
+    });
 
   var oldTenders = this.parsedTenders || new Tree();
 
   var newTenders = oldRoot.get('tenders', new Tree())
     .diff(newRoot.get('tenders'))
-    .filter(p => p.path.indexOf('001/7') === 0)
+    .filter(p => p.path.indexOf('001/70') === 0)
     .map(mapTender)
     .apply(oldTenders);
 
-  var delta = oldTenders
-    .diff(newTenders)
-    .map(mapStatuses)
-    .toTree();
+  var reducer = function(buffers){
+    return new Buffer(
+      JSON.stringify(
+        buffers.reduce((s, b) => s.concat(JSON.parse(b)), [])
+      )
+    );
+  };
 
-  this.ტენდერებისტატუსებისმიხედვით = (this.ტენდერებისტატუსებისმიხედვით || new Tree())
-    .cd(function(){
+  var prevState = this.state;
 
-      var reducer = function(buffers){
-        return new Buffer(
-          JSON.stringify(
-            buffers.reduce((s, b) => s.concat(JSON.parse(b)), [])
-          )
-        );
-      };
+  this.version = Blob.of({ Hello: 'Tree' });
 
-      this.reduced1 = delta.get('A').cd(function(){
-        Object.keys(this).forEach(dir => this[dir] = this[dir].reduce(reducer));
+  this.state = (prevState || new Tree()).cd(function(){
+    if(prevState){
+      this.prevState = prevState;
+    }
+
+    this.delta = oldTenders.diff(newTenders).map(mapStatuses).toTree();
+
+    if(!prevState){
+      this.reduced = this.delta.get('A').cd(function(){
+        for(var key in this){
+          this[key] = this[key].reduce(reducer);
+        }
       });
+    } else {
 
-      this.reduced = delta.reduce(reducer);
-    });
-
-
+    }
+  });
 
 
   function mapStatuses(key, buffer){

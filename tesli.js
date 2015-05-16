@@ -79,13 +79,42 @@ export class Tree {
   }
 }
 
-class Blob {
+export class Blob {
   constructor(shaFn){
     if(typeof shaFn === 'string') {
       this.shaFn = (git) => Promise.resolve(shaFn);
     } else {
       this.shaFn = shaFn;
     }
+  }
+  static of(value){
+    return new Blob(async (git) => {
+      return await git.hashObject(new Buffer(JSON.stringify(value)));
+    });
+  }
+
+  toTree(fn){
+    return new Tree(async (git) => {
+      var entries = [];
+      var buffer = await git.cat(await this.getSha(git));
+
+      fn.call({
+        emit: function(path, buffer){
+          entries.push({ path, buffer });
+        }
+      }, buffer);
+
+      var treeEntries = await Promise.all(
+        entries.map(async e => ({
+          mode: '100644',
+          type: 'blob',
+          sha: await git.hashObject(e.buffer),
+          path: e.path
+        }))
+      );
+
+      return await git.mkDeepTree(treeEntries);
+    });
   }
 
   getSha(git){

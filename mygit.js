@@ -27,7 +27,7 @@ module.exports = function gitStreamer(gitDir) {
   var spawn = function(args, options){
     var spawn = require('child_process').spawn;
     var args2 = [`--git-dir=${gitDir}`].concat(args);
-    debug('git ' + args2.join(' '));
+    debug('git ' + args2.join(' ') + ' ' + JSON.stringify(options));
     return spawn('git', args2, options);
   }
 
@@ -185,6 +185,7 @@ module.exports = function gitStreamer(gitDir) {
 
       return {
         cat: function(sha, cb){
+          debug('cat ' + sha);
           cbs.push({ sha, cb });
           child.stdin.write(sha + '\n');
         },

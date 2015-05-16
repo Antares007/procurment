@@ -25,6 +25,22 @@ git.openIndex = function(path) {
   }
 };
 
+var emptyTreeSha = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+
+git.mkDeepTree = async function(entries){
+  var defer = Promise.defer();
+  var index = git.openIndex('indexDeepTree');
+  await index.readTree(emptyTreeSha);
+  var indexInfoWriter = index.createUpdateIndexInfoStream();
+  indexInfoWriter
+    .once('error', err => defer.reject(err))
+    .once('child.exit', () => defer.resolve())
+    .write(entries.map(e => `${e.mode} ${e.sha}\t${e.path}`).join('\n'));
+  indexInfoWriter.end();
+  await defer.promise;
+  return await index.writeTree();
+}
+
 var { Tree } = require('./tesli.js');
 var tesli = require('./03_.js');
 
