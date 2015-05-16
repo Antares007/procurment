@@ -24,7 +24,7 @@ export class AStream {
       .on('error', err => defer.reject(err))
       .pipe(writable)
       .on('error', err => defer.reject(err))
-      .on('finish', () => setTimeout(() => defer.resolve(), 1000));
+      .on('child.exit', () => defer.resolve());
       // TODO: after finish index is still locked. wait process to exit
     return defer.promise;
   }

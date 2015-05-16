@@ -63,13 +63,15 @@ module.exports = function gitStreamer(gitDir) {
         createUpdateIndexInfoStream: function(){
 
           var child = spawn(['update-index', '--index-info'], options);
-
+          child.once('exit', function(){
+            child.stdin.emit('child.exit');
+          });
           child.stdout.on('data', function(data){
             console.log('uiis stdout', data);
-          })
+          });
           child.stderr.on('data', function(data){
             console.log('uiis stderr', data.toString());
-          })
+          });
           return child.stdin;
         }
       }
