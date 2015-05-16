@@ -3,6 +3,7 @@ var split = require('split');
 var transform = require('./transform.js');
 var assert = require('assert');
 var {AStream} = require('./astream.js');
+var debug = require('debug')('mygit');
 
 module.exports = function gitStreamer(gitDir) {
   var gitCmdBase = `git --git-dir=${gitDir} `;
@@ -26,6 +27,7 @@ module.exports = function gitStreamer(gitDir) {
   var spawn = function(args, options){
     var spawn = require('child_process').spawn;
     var args2 = [`--git-dir=${gitDir}`].concat(args);
+    debug('git ' + args2.join(' '));
     return spawn('git', args2, options);
   }
 
@@ -199,6 +201,7 @@ function exec(str, opt, cb) {
     cb = opt;
     opt = { encoding: 'utf8', timeout: 0, maxBuffer: 200*1024, killSignal: 'SIGTERM' };
   }
+  debug(str);
   return require('child_process').exec(
     str,
     opt,
