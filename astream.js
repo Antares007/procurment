@@ -39,7 +39,23 @@ export class AStream {
   transform(fn){
     return new AStream(() => pipe(
       this.readableStreamFactory(),
-      transform(fn)
+      transform(function(x, next){
+        var ds = this;
+        var maybePromise = fn.call(
+          this,
+          x,
+          () => { if(!(maybePromise instanceof Promise)) next(); }
+        );
+        if(maybePromise instanceof Promise){
+          maybePromise
+            .then(next)
+            .catch(function(err){
+              process.nextTick(function(){
+                ds.emit('error', err);
+              });
+            });
+        }
+      })
     ));
   }
 

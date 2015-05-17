@@ -33,7 +33,7 @@ export class Tree {
   }
 
   diff(other){
-    return new Diff(async (git) => git.diffTree(await this.getSha(git), await other.getSha(git)));
+    return new Diff(this, other);
   }
 
   cd(fn){
@@ -126,63 +126,69 @@ export class Blob {
 }
 
 class Diff {
-  constructor(promisedAStream){
-    this.promisedAStream = promisedAStream;
+  constructor(tree1, tree2, streamOperations = (git, astream) => astream){
+    this.tree1 = tree1;
+    this.tree2 = tree2;
+    this.streamOperations = streamOperations;
   }
-  filter(filter){
-    return new Diff(git =>
-      this.promisedAStream(git).then(function(astream){
-        return astream.filter(filter);
-      })
+
+  filter(fn){
+    return new Diff(
+      this.tree1, this.tree2,
+      (git, astream) => this.streamOperations(git, astream).filter(patch => fn(patch.path))
     );
   }
-  map(mapFunction){
-    return new Diff(async (git) => {
-      var astream = await this.promisedAStream(git);
-      return astream
-        .transform(function(p, next){
-          var { path, status, newSha, oldSha, mode } = p;
-          if(newSha) { this.push({ path, status: 'A', sha: newSha, mode }); }
-          if(oldSha) { this.push({ path, status: 'D', sha: oldSha, mode }); }
-          next();
-        })
-        .map(async function(p){
-          var ds = [];
-          var emitedValues = [];
-          var emiter = function (key, value) { emitedValues.push({ key, value }); };
 
-          var buffer = await git.cat(p.sha);
+  transform(fn){
+    return new Diff(
+      this.tree1, this.tree2,
+      (git, astream) => this.streamOperations(git, astream).transform(async function(patch){
+        var emitedPaths = {};
+        var transform = async function(prefix){
+          var shaPropName = prefix + 'Sha';
+          var bufferPropName = prefix + 'Buffer';
+          var emiter = function(path, buffer){
+            var newPatch = emitedPaths[path];
+            if(!newPatch){
+              emitedPaths[path] = { [bufferPropName]: buffer };
+            } else {
+              if(!newPatch[bufferPropName]){
+                newPatch[bufferPropName] = buffer;
+              } else {
+                this.emit('error', new Error('path already is leaf'));
+              }
+            }
+          };
+          fn.call({emit: emiter}, patch.path, await git.cat(patch[shaPropName]));
+        };
 
-          mapFunction.call({emit: emiter}, p.path, buffer);
+        if(patch.newSha){ await transform('new'); }
+        if(patch.oldSha){ await transform('old'); }
 
-          for(var i in emitedValues){
-            var emited = emitedValues[i];
-            var sha = await git.hashObject(new Buffer(JSON.stringify(emited.value), 'utf8'));
-            var blobName = hash(p.path + '/' + i);
-            ds.push({
-              path: emited.key + '/' + blobName,
-              status: p.status,
-              sha,
-              mode: '100644'
-            });
+        for(var path in emitedPaths){
+          var {oldBuffer, newBuffer} = emitedPaths[path];
+          if(oldBuffer && newBuffer){
+            this.push({ status: 'M', path, newSha: await git.hashObject(newBuffer),
+                                           oldSha: await git.hashObject(oldBuffer), mode: '100644' });
+          } else if(newBuffer){
+            this.push({ status: 'A', path, newSha: await git.hashObject(newBuffer), mode: '100644' });
+          } else {
+            this.push({ status: 'D', path, oldSha: await git.hashObject(oldBuffer), mode: '100644' });
           }
-          return ds;
-        })
-        .transform(function(values, next){
-          var ds = this;
-          values.forEach(function(v){
-            var { path, status, sha, mode } = v;
-            ds.push({ path, status, [status === 'A' ? 'newSha' : 'oldSha']: sha, mode })
-          });
-          next();
-        });
-    });
+        }
+      })
+    );
   }
 
   toTree(){
     return new Tree(async (git) => {
-      var patchsStream = await this.promisedAStream(git);
-
+      var patchsStream = this.streamOperations(
+        git,
+        git.diffTree(
+          await this.tree1.getSha(git),
+          await this.tree2.getSha(git)
+        )
+      );
       var index = git.openIndex('testIndex2');
 
       await index.readTree(await new Tree().getSha(git));
@@ -201,7 +207,13 @@ class Diff {
 
   apply(tree){
     return new Tree(async (git) => {
-      var patchsStream = await this.promisedAStream(git);
+      var patchsStream = this.streamOperations(
+        git,
+        git.diffTree(
+          await this.tree1.getSha(git),
+          await this.tree2.getSha(git)
+        )
+      );
 
       var index = git.openIndex('testIndex2');
 
@@ -210,7 +222,7 @@ class Diff {
       await patchsStream
         .map(function(p){
           var { path, status, newSha, mode } = p;
-          if(status === 'A'){
+          if(status !== 'D'){
             return `${mode} ${newSha}\t${path}\n`
           } else {
             return `0 0000000000000000000000000000000000000000\t${path}\n`;
@@ -223,7 +235,6 @@ class Diff {
     });
   }
 }
-
 var crypto = require('crypto');
 function hash(value){
   var shasum = crypto.createHash('sha1');

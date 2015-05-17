@@ -1,5 +1,5 @@
-var { Tree, Blob } = require('./tesli.js');
 var parsers = require('./parser');
+var { Tree, Blob } = require('./tesli.js');
 
 module.exports = function(oldRoot, newRoot) {
 
@@ -9,12 +9,37 @@ module.exports = function(oldRoot, newRoot) {
       list.forEach(x => this.emit('avi/' + x, new Buffer(x)));
     });
 
+  this.version = Blob.of({ Hello: 'Tree' });
+
+  var j = 0;
+
+  var fn = function(){
+    j++;
+    this.value = Blob.of('.');
+    if(j>10) {
+      return;
+    }
+    this['d'+j] = new Tree().cd(fn);
+  };
+  fn.call(this);
+
+  this.d1Reduced = this.d1.reduce(function(buffers){
+    return Buffer.concat(buffers);
+  });
+
   var oldTenders = this.parsedTenders || new Tree();
 
   var newTenders = oldRoot.get('tenders', new Tree())
     .diff(newRoot.get('tenders'))
-    .filter(p => p.path.indexOf('001/70') === 0)
-    .map(mapTender)
+    .filter(path => path.indexOf('001/7') === 0)
+    .transform(function(path, buffer) {
+      var i = 0;
+      var emiter = (key, value) => this.emit(
+        key + '/' + hash(path + (i++)),
+        new Buffer(JSON.stringify(value))
+      );
+      mapTender.call({ emit:  emiter }, path, buffer);
+    })
     .apply(oldTenders);
 
   var reducer = function(buffers){
@@ -27,14 +52,21 @@ module.exports = function(oldRoot, newRoot) {
 
   var prevState = this.state;
 
-  this.version = Blob.of({ Hello: 'Tree' });
-
   this.state = (prevState || new Tree()).cd(function(){
     if(prevState){
       this.prevState = prevState;
     }
 
-    this.delta = oldTenders.diff(newTenders).map(mapStatuses).toTree();
+    this.delta = oldTenders.diff(newTenders)
+      .transform(function(path, buffer) {
+        var i = 0;
+        var emiter = (key, value) => this.emit(
+          key + '/' + hash(path + (i++)),
+          new Buffer(JSON.stringify(value))
+        );
+        mapStatuses.call({ emit:  emiter }, path, buffer);
+      })
+      .toTree();
 
     if(!prevState){
       this.reduced = this.delta.get('A').cd(function(){
@@ -77,3 +109,10 @@ module.exports = function(oldRoot, newRoot) {
     }
   }
 };
+
+var crypto = require('crypto');
+function hash(value){
+  var shasum = crypto.createHash('sha1');
+  shasum.update(value.toString());
+  return shasum.digest('hex');
+}
