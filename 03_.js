@@ -12,14 +12,12 @@ module.exports = function(oldRoot, newRoot) {
   this.version = Blob.of({ Hello: 'Tree' });
 
   var j = 0;
-
   var fn = function(){
-    j++;
-    this.value = Blob.of('.');
-    if(j>10) {
-      return;
+    this.value = Blob.of(1);
+
+    if(j++ < 10) {
+      this['d' + j] = new Tree().cd(fn);
     }
-    this['d'+j] = new Tree().cd(fn);
   };
   fn.call(this);
 
@@ -33,11 +31,7 @@ module.exports = function(oldRoot, newRoot) {
     .diff(newRoot.get('tenders'))
     .filter(path => path.indexOf('001/7') === 0)
     .transform(function(path, buffer) {
-      var i = 0;
-      var emiter = (key, value) => this.emit(
-        key + '/' + hash(path + (i++)),
-        new Buffer(JSON.stringify(value))
-      );
+      var emiter = (key, value) => this.emit(key, new Buffer(JSON.stringify(value)));
       mapTender.call({ emit:  emiter }, path, buffer);
     })
     .apply(oldTenders);
@@ -49,34 +43,58 @@ module.exports = function(oldRoot, newRoot) {
       )
     );
   };
+  var merger = (a, b) => reducer([a, b]);
 
   var prevState = this.state;
 
-  this.state = (prevState || new Tree()).cd(function(){
+  this.state = new Tree().cd(function(){
     if(prevState){
       this.prevState = prevState;
     }
 
     this.delta = oldTenders.diff(newTenders)
       .transform(function(path, buffer) {
-        var i = 0;
-        var emiter = (key, value) => this.emit(
-          key + '/' + hash(path + (i++)),
-          new Buffer(JSON.stringify(value))
-        );
+        var emiter = (key, value) => this.emit(key, new Buffer(JSON.stringify(value)));
         mapStatuses.call({ emit:  emiter }, path, buffer);
       })
       .toTree();
 
     if(!prevState){
-      this.reduced = this.delta.get('A').cd(function(){
+      this.reduced = this.delta.get('A/new').cd(function(){
         for(var key in this){
           this[key] = this[key].reduce(reducer);
         }
       });
     } else {
+      this.reduced = new Tree()
+        .merge(
+          this.delta.get('A', new Tree()).cd(function(){
+            for(var key in this){
+              this[key] = this[key].reduce(reducer)
+                .merge(prevState.get('reduced/' + key, new Tree()).reduce(reducer), merger);
+            }
+          }),
+          merger
+        ).merge(
+          this.delta.get('D', new Tree()).cd(function(){
+            var recurse = function(key, prevState, deteted){
+              return function(){
+                this.values = prevState.get()
+              }
+            }
+            for(var key in this){
+              this[key] = new Tree().cd(recurse(key, prevState, this[key])).reduce(reducer);
+            }
+          }),
+          merger
+        ).merge(
+          this.delta.get('M', new Tree()).cd(function(){
 
+          }),
+          merger
+        );
     }
+
   });
 
 
