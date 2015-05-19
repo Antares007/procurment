@@ -3,112 +3,71 @@ var { Tree, Blob } = require('./tesli.js');
 
 module.exports = function(oldRoot, newRoot) {
 
-  this.treeFromBlob = Blob.of(['a','v','i'])
-    .toTree(function(buffer){
-      var list = JSON.parse(buffer.toString());
-      list.forEach(x => this.emit('avi/' + x, new Buffer(x)));
-    });
+  // var oldTenders = this.parsedTenders || new Tree();
 
-  this.version = Blob.of({ Hello: 'Tree' });
+  // var newTenders = oldRoot.get('tenders', new Tree())
+  //   .diff(newRoot.get('tenders'))
+  //   .filter(path => path.indexOf('001/70') === 0)
+  //   .transform(function(path, buffer) {
+  //     var emiter = (key, value) => this.emit(key, new Buffer(JSON.stringify(value)));
+  //     mapTender.call({ emit:  emiter }, path, buffer);
+  //   })
+  //   .apply(oldTenders);
 
-  var j = 0;
-  var fn = function(){
-    this.value = Blob.of(1);
 
-    if(j++ < 10) {
-      this['d' + j] = new Tree().cd(fn);
+  this.r = Tree.of({
+    a: 1,
+    b: {
+      a: 1,
+      b: 2,
+      c: {
+        a: 99,
+        b: 77,
+        c: {
+          a: 66
+        }
+      }
+    },
+    c:{
+      a:{
+        b:{
+          c: 88
+        }
+      },
+      b:{
+        b:{
+          c: 88
+        }
+      }
     }
-  };
-  fn.call(this);
-
-  this.d1Reduced = this.d1.reduce(function(buffers){
+  }).reduce(1, function(buffers){
     return Buffer.concat(buffers);
   });
 
-  var oldTenders = this.parsedTenders || new Tree();
-
-  var newTenders = oldRoot.get('tenders', new Tree())
-    .diff(newRoot.get('tenders'))
-    .filter(path => path.indexOf('001/7') === 0)
-    .transform(function(path, buffer) {
-      var emiter = (key, value) => this.emit(key, new Buffer(JSON.stringify(value)));
-      mapTender.call({ emit:  emiter }, path, buffer);
-    })
-    .apply(oldTenders);
-
-  var reducer = function(buffers){
-    return new Buffer(
-      JSON.stringify(
-        buffers.reduce((s, b) => s.concat(JSON.parse(b)), [])
-      )
-    );
-  };
-  var merger = (a, b) => reducer([a, b]);
-
-  var prevState = this.state;
-
-  this.state = new Tree().cd(function(){
-    if(prevState){
-      this.prevState = prevState;
-    }
-
-    this.delta = oldTenders.diff(newTenders)
-      .transform(function(path, buffer) {
-        var emiter = (key, value) => this.emit(key, new Buffer(JSON.stringify(value)));
-        mapStatuses.call({ emit:  emiter }, path, buffer);
-      })
-      .toTree();
-
-    if(!prevState){
-      this.reduced = this.delta.get('A/new').cd(function(){
-        for(var key in this){
-          this[key] = this[key].reduce(reducer);
-        }
-      });
-    } else {
-      this.reduced = new Tree()
-        .merge(
-          this.delta.get('A', new Tree()).cd(function(){
-            for(var key in this){
-              this[key] = this[key].reduce(reducer)
-                .merge(prevState.get('reduced/' + key, new Tree()).reduce(reducer), merger);
-            }
-          }),
-          merger
-        ).merge(
-          this.delta.get('D', new Tree()).cd(function(){
-            var recurse = function(key, prevState, deteted){
-              return function(){
-                this.values = prevState.get()
-              }
-            }
-            for(var key in this){
-              this[key] = new Tree().cd(recurse(key, prevState, this[key])).reduce(reducer);
-            }
-          }),
-          merger
-        ).merge(
-          this.delta.get('M', new Tree()).cd(function(){
-
-          }),
-          merger
-        );
-    }
-
+  this.r0 = this.r.toBlob(function(buffers){
+    return Buffer.concat(buffers);
   });
 
+  return;
+  var mapReduce = makeMapReducer();
 
-  function mapStatuses(key, buffer){
-    var id = parseInt(key.split('/')[0], 10);
-    var tender = JSON.parse(buffer.toString());
-    this.emit((tender.app_main || { 'ტენდერის სტატუსი': 'შეცდომა' })['ტენდერის სტატუსი'], [id]);
-  }
+  this.სტატუსები = mapReduce({
+    tenders: function(path, buffer){
+      var id = parseInt(key.split(/\/|\./).splice(0, 2).join(''), 10);
+      var tender = parseTender(buffer);
+      var mapKey = tender.app_main
+        ? tender.app_main['ტენდერის სტატუსი']
+        : 'შეცდომა';
+      var mapValue = [id];
 
-  function mapTender(key, buffer){
-    var tender = parseTender(buffer);
-    var id = parseInt(key.split(/\/|\./).splice(0, 2).join(''), 10);
-    this.emit(id.toString(), tender);
-  }
+      this.emit(mapKey, new Buffer(JSON.stringify(mapValue)));
+    }
+  }, function(buffers){
+    var values = buffers.map(JSON.parse);
+    var reducedValue = values.reduce((s, b) => s.concat(b), []);
+    return new Buffer(JSON.stringify(reducedValue));
+  });
+
 
   function parseTender(buffer){
     var pages = buffer.toString('utf8').split(String.fromCharCode(0));
@@ -128,9 +87,8 @@ module.exports = function(oldRoot, newRoot) {
   }
 };
 
-var crypto = require('crypto');
-function hash(value){
-  var shasum = crypto.createHash('sha1');
-  shasum.update(value.toString());
-  return shasum.digest('hex');
-}
+function makeMapReducer(){
+  return function(mapers, reducer){
+
+  };
+};

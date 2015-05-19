@@ -1,4 +1,5 @@
 var crypto = require('crypto');
+var _ = require('lodash');
 var debug = require('debug')('tesli');
 var emptyTreeSha = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
@@ -46,6 +47,24 @@ export class Tree {
 
       fn.call(tree, tree);
 
+      return await Tree.of(tree).getSha(git);
+    });
+  }
+
+  static of(tree){
+    return new Tree(async (git) => {
+
+      Object.keys(tree).forEach(function(key){
+        if(tree[key] instanceof Tree || tree[key] instanceof Blob){
+          return;
+        }
+        if(tree[key].__proto__ === Object.prototype){
+          tree[key] = Tree.of(tree[key]);
+        } else {
+          tree[key] = Blob.of(tree[key]);
+        }
+      });
+
       return await git.mktree(
         await Promise.all(
           Object.keys(tree).map(async function(name){
@@ -60,24 +79,55 @@ export class Tree {
     });
   }
 
-  reduce(fn){
+  reduce(depth, fn){
+    if(typeof depth === 'function'){
+      fn = depth;
+      depth = 0;
+    }
+    return new Tree(async (git) => {
+      var sha = await this.getSha(git);
+      debug('reducing: ' + sha);
+      var entries = await git.lsTree(sha);
+
+      var newEntries = await Promise.all(
+        entries.map(async function(e) {
+          var {mode, type, sha, name} = e;
+          if(type !== 'tree'){ return e; }
+          if(depth === 0){
+            sha = await (new Tree(sha).toBlob(fn).getSha(git));
+            type = 'blob';
+            mode = '100644';
+          } else {
+            sha = await (new Tree(sha).reduce(depth - 1, fn).getSha(git));
+          }
+          return {mode, type, sha, name};
+        })
+      );
+
+      debug('reduced: ' + sha);
+      return await git.mktree(newEntries);
+    });
+  }
+
+  toBlob(fn){
     return new Blob(async (git) => {
       var sha = await this.getSha(git);
-      debug('reduceing: ' + sha);
+      debug('blobing: ' + sha);
       var entries = await git.lsTree(sha);
 
       var shas = await Promise.all(
-        entries.map(x => x.type === 'tree' ? new Tree(x.sha).reduce(fn).getSha(git) : x.sha)
+        entries.map(x => x.type === 'tree' ? new Tree(x.sha).toBlob(fn).getSha(git) : x.sha)
       );
 
       var buffers = await Promise.all(shas.map(x => git.cat(x)));
       var blobSha = await git.hashObject(fn(buffers));
-      debug('rediced: ' + sha +' -> ' + blobSha);
+      debug('blobed: ' + sha +' -> ' + blobSha);
       return blobSha;
     });
   }
+
   merge(other, mergerFn){
-    return new Diff(this, other).merge(mergerFn);
+    throw new Error('not implemented');
   }
 }
 
@@ -119,6 +169,17 @@ export class Blob {
     });
   }
 
+  merge(other, merger){
+    return new Blob(async (git) => {
+      return await git.hashObject(
+        merger(
+          await git.cat(await this.getSha(git)),
+          await git.cat(await other.getSha(git))
+        )
+      );
+    });
+  }
+
   getSha(git){
     if(this.promisedSha)
       return this.promisedSha;
@@ -127,6 +188,7 @@ export class Blob {
   }
 }
 
+var indexapply = 0;
 class Diff {
   constructor(tree1, tree2, streamOperations = (git, astream) => astream){
     this.tree1 = tree1;
@@ -184,29 +246,16 @@ class Diff {
     );
   }
 
-  merge(mergerFn){
-    return new Diff(
-      this.tree1, this.tree2,
-      (git, astream) => this.streamOperations(git, astream).transform(async function(patch){
-        var {path, newSha, oldSha, mode} = patch;
-        var newBuffer = newSha && oldSha
-          ? mergerFn(await git.cat(oldSha), await git.cat(newSha))
-          : await git.cat(oldSha || newSha);
-        this.push({ status: 'A', path, newSha: await git.hashObject(newBuffer), mode });
-      })
-    ).apply(new Tree());
-  }
-
   toTree(){
     return new Diff(
       this.tree1, this.tree2,
       (git, astream) => this.streamOperations(git, astream).transform(function(patch, next){
         var {status, path, newSha, oldSha, mode} = patch;
         if(newSha){
-          this.push({ status: 'A', path: status + '/new/'+ path, newSha: newSha, mode });
+          this.push({ status: 'A', path: status + '/new/'+ path, newSha: newSha, mode: '100644' });
         }
         if(oldSha){
-          this.push({ status: 'A', path: status + '/old/'+ path, newSha: oldSha, mode });
+          this.push({ status: 'A', path: status + '/old/'+ path, newSha: oldSha, mode: '100644' });
         }
         next();
       })
@@ -223,7 +272,7 @@ class Diff {
         )
       );
 
-      var index = git.openIndex('testIndex2');
+      var index = git.openIndex('indexapply' + (indexapply++));
 
       await index.readTree(await tree.getSha(git));
 
@@ -243,6 +292,38 @@ class Diff {
     });
   }
 }
+
+class Commit {
+  constructor(shaFn = (git) => git.commitTree(emptyTreeSha)){
+    this.isEmpty = true;
+    if(typeof shaFn === 'string') {
+      this.shaFn = (git) => Promise.resolve(shaFn);
+    } else {
+      this.shaFn = shaFn;
+    }
+  }
+
+  getSha(git, message){
+    if(this.promisedSha)
+      return this.promisedSha;
+    return this.promisedSha = this.shaFn(git);
+  }
+
+  plant(seed){
+    return new Commit(async (git) => {
+
+    });
+  }
+
+  grow(...rootCommits){
+    return new Commit(async (git) => {
+      var oldTree = await this.getTree()
+
+      git.commitTree()
+    });
+  }
+}
+
 function hash(value){
   var shasum = crypto.createHash('sha1');
   shasum.update(value.toString());
