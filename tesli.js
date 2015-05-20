@@ -53,7 +53,6 @@ export class Tree {
 
   static of(tree){
     return new Tree(async (git) => {
-
       Object.keys(tree).forEach(function(key){
         if(tree[key] instanceof Tree || tree[key] instanceof Blob){
           return;
@@ -126,9 +125,6 @@ export class Tree {
     });
   }
 
-  merge(other, mergerFn){
-    throw new Error('not implemented');
-  }
 }
 
 export class Blob {
@@ -165,7 +161,7 @@ export class Blob {
         }))
       );
 
-      return await git.mkDeepTree(treeEntries);
+      return await git.mkDeepTree(emptyTreeSha, treeEntries);
     });
   }
 
@@ -188,7 +184,6 @@ export class Blob {
   }
 }
 
-var indexapply = 0;
 class Diff {
   constructor(tree1, tree2, streamOperations = (git, astream) => astream){
     this.tree1 = tree1;
@@ -203,6 +198,15 @@ class Diff {
     );
   }
 
+  partitionBy(fn){
+    return new Diff(
+      this.tree1, this.tree2,
+      (git, astream) => this.streamOperations(git, astream).map(async function(patch){
+        patch.path = fn(patch.path);
+        return patch;
+      })
+    );
+  }
   transform(fn){
     return new Diff(
       this.tree1, this.tree2,
@@ -270,25 +274,10 @@ class Diff {
           await this.tree1.getSha(git),
           await this.tree2.getSha(git)
         )
-      );
+      )
+      .pipe(require('./logprogress.js')(1000));
 
-      var index = git.openIndex('indexapply' + (indexapply++));
-
-      await index.readTree(await tree.getSha(git));
-
-      await patchsStream
-        .map(function(p){
-          var { path, status, newSha, mode } = p;
-          if(status !== 'D'){
-            return `${mode} ${newSha}\t${path}\n`
-          } else {
-            return `0 0000000000000000000000000000000000000000\t${path}\n`;
-          }
-        })
-        .pipe(require('./logprogress.js')(10))
-        .writeTo(index.createUpdateIndexInfoStream());
-
-      return await index.writeTree();
+      return git.mkDeepTree(await tree.getSha(git), patchsStream);
     });
   }
 }

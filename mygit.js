@@ -46,7 +46,7 @@ module.exports = function gitStreamer(gitDir) {
     },
     trimOutput: (stdout) => stdout.trim()
   };
-  return {
+  var api = {
     exec: git,
     spawn: spawn,
     mappers: mappers,
@@ -195,6 +195,7 @@ module.exports = function gitStreamer(gitDir) {
       };
     }
   };
+  return denodeifyApi(api);
 }
 
 function exec(str, opt, cb) {
@@ -217,3 +218,72 @@ function exec(str, opt, cb) {
     }
   );
 };
+
+function denodeifyApi(mygit){
+  var denodeify = require('./denodeify.js');
+  var git = [
+    'revParse',
+    'lsTree',
+    'mktree',
+    'hashObject'
+  ].reduce((s, x) => (s[x] = denodeify(mygit[x]), s), {});
+
+  git.catFileBatch = function(){
+    var batch = mygit.catFileBatch();
+    return {
+      cat: denodeify(batch.cat),
+      end: batch.end
+    }
+  }
+
+  git.diffTree = mygit.diffTree;
+
+  git.openIndex = function(path) {
+    var index = mygit.openIndex(path);
+    return {
+      readTree: denodeify(index.readTree),
+      writeTree: denodeify(index.writeTree),
+      createUpdateIndexInfoStream: index.createUpdateIndexInfoStream
+    }
+  };
+
+  var emptyTreeSha = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+
+  var indexInfoId = 0;
+  var toIndexInfoLine = function(p){
+    var { path, status, newSha, mode, sha } = p;
+    if(status){
+      return status !== 'D'
+        ? `${mode} ${newSha}\t${path}\n`
+        : `0 0000000000000000000000000000000000000000\t${path}\n`;
+    } else {
+      return `${mode} ${sha}\t${path}\n`
+    }
+  };
+
+  git.mkDeepTree = async function(baseTree, patchStream){
+    var indexFileName = 'index' + process.pid + '.' + (indexInfoId++) + '.tmp';
+    var index = git.openIndex(indexFileName);
+    await index.readTree(baseTree);
+    var indexInfo = index.createUpdateIndexInfoStream();
+
+    if(Array.isArray(patchStream)){
+      var defer = Promise.defer();
+      indexInfo
+        .once('error', err => defer.reject(err))
+        .once('child.exit', () => defer.resolve())
+        .write(patchStream.map(toIndexInfoLine).join(''));
+      indexInfo.end();
+      await defer.promise;
+    } else {
+      await patchStream
+        .map(toIndexInfoLine)
+        .writeTo(indexInfo);
+    }
+    var sha = await index.writeTree();
+    require('fs').unlink(indexFileName);
+    return sha;
+  }
+
+  return git;
+}
