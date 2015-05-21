@@ -1,3 +1,8 @@
+var mkdirp = require('mkdirp');
+var zlib = require('zlib');
+var fs = require('fs');
+var path = require('path');
+var crypto = require('crypto');
 var stream = require('stream');
 var split = require('split');
 var transform = require('./transform.js');
@@ -113,6 +118,24 @@ module.exports = function gitStreamer(gitDir) {
       );
     },
     hashObject: function(buffer, cb) {
+
+      var shasum = crypto.createHash('sha1');
+      var header = new Buffer("blob " + buffer.length + "\0");
+      shasum.update(header);
+      shasum.update(buffer);
+      var sha = shasum.digest('hex');
+      var fileDir = gitDir + '/objects/' + sha.slice(0,2);
+      var filePath = fileDir + '/' + sha.slice(2);
+      zlib.deflate(Buffer.concat([header, buffer]), function(err, buffer){
+        if(err) return cb(err);
+        mkdirp(fileDir, function(){
+          fs.writeFile(filePath, buffer, function(err){
+            if(err) return cb(err);
+            cb(null, sha);
+          });
+        });
+      });
+      return;
       git(
         'hash-object --stdin -t blob -w',
         [mappers.trimOutput],
