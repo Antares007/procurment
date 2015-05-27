@@ -1,4 +1,3 @@
-var crypto = require('crypto');
 var debug = require('debug')('tesli');
 var emptyTreeSha = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
@@ -125,8 +124,3 @@ class Diff {
   }
 }
 
-function hash(value){
-  var shasum = crypto.createHash('sha1');
-  shasum.update(value.toString());
-  return shasum.digest('hex');
-}

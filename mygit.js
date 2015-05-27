@@ -108,9 +108,10 @@ module.exports = function gitStreamer(gitDir) {
       var data = entries.map(e => `${e.mode} ${e.type} ${e.sha}\t${e.name}`).join('\n');
       git('mktree --missing', [mappers.trimOutput], cb).stdin.end(data, 'utf8');
     },
-    commitTree: function(treeSha, parentShas, cb) {
+    commitTree: function(treeSha, parentShas, message, cb) {
       var parents = parentShas.length > 0 ? '-p ' + parentShas.join(' -p ') : '';
-      git('commit-tree -m "c" ' + parents + ' ' + treeSha, [mappers.trimOutput], cb);
+      git('commit-tree ' + parents + ' ' + treeSha, [mappers.trimOutput], cb)
+        .stdin.end(message);
     },
     getCommit: function(sha, cb) {
       var self = this;
@@ -270,6 +271,7 @@ function exec(str, opt, cb) {
 function denodeifyApi(mygit){
   var denodeify = require('./denodeify.js');
   var git = [
+    'exec',
     'revParse',
     'lsTree',
     'commitTree',

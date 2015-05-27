@@ -15,11 +15,11 @@ export class Commit extends GitObject {
     })
   }
 
-  static create(tree, parents=[]){
+  static create(tree, parents=[], message=""){
     return new Commit(async (git) => {
       var treeSha = await tree.getSha(git);
       var parentShas = await Promise.all(parents.map(p => p.getSha(git)));
-      return await git.commitTree(treeSha, parentShas);
+      return await git.commitTree(treeSha, parentShas, message);
     });
   }
 }
