@@ -1,47 +1,84 @@
-var rootCommit;
-var thisHeadCommit;
-var mapTenders;
-var khe;
+var argv = require('yargs').argv;
+var path = require('path');
+var mygit = require('./mygit.js');
 
-// var cp0 = mapTenders()
-// var cp1 = mapTenders()
-// var cp2 = mapTenders()
-// var cp3 = mapTenders()
-// var cp4 = mapTenders()
+var Tree = require('./tesli/tree').Tree,
+  Commit = require('./tesli/commit').Commit,
+  Blob = require('./tesli/blob').Blob;
 
+class ხე {
+  constructor(commitFn){
+    this.commitFn = commitFn;
+  }
 
-// thisTreeComit.merge(cp0, cp1, cp2, cp3, cp4);
+  გამოხშირე(fn){
+    new ხე(() => {
 
-makeTree(null, '38f5e5fa6f33cac790c29650bead4f88905b2abb', null, function(err, sha){
-  if(err) console.log(err.stack);
-  console.log(sha);
-})
+      var tesli = {
+        სახეობა: 'გამოხშირე',
+        ფუნქცია: hash(fn.toString())
+      };
 
-function makeTree(oldRootSha, newRootSha, oldTreeSha, cb){
-  var debug = require('debug')('tesliRunner');
-  var mygit = require('./mygit.js');
-  var git = mygit('/data/procurment-data2/.git');
+      var newRootCommit = this.commitFn(tesli);
 
-  var { Tree } = require('./tesli.js');
-  var tesli = require('./03_.js');
+      // var {diff, oldTreeCommit} = getPrevCommits(rootCommit, tesli);
 
-  var oldRoot = new Tree();
-  var newRoot = new Tree('38f5e5fa6f33cac790c29650bead4f88905b2abb');
+      var oldTreeCommit = new Commit(async (git) => {
+        var newRootSha = await newRootCommit.getSha(git);
 
-  var oldTree = new Tree();
-  var newTree = oldTree.cd(function(oldTreeDir){
-    tesli.call(oldTreeDir, oldRoot, newRoot);
-  });
+        return sha;
+      });
 
-  var batchCat = git.catFileBatch();
-  git.cat = batchCat.cat;
-  newTree.getSha(git).then(function(sha){
-    batchCat.end();
-    cb(null, sha);
-  }).catch(function(err){
-    console.log('aaa');
-    batchCat.end();
-    console.log(err);
-    cb(err);
-  });
+      var newTree = new Tree(async (git) => {
+        var oldTreeCommitSha = await oldTreeCommit.getSha(git);
+        var oldCommit = await git.getCommit(oldTreeCommitSha);
+        var oldRootTreeSha = oldCommit.parents.length > 0
+          ? await git.revParse(oldCommit.parents[0] + '{tree}')
+          : emptyTreeSha;
+          var newRootTreeSha;
+          var stream = git.diff(oldRootTreeSha, newRootTreeSha);
+
+          var writedTreeSha;
+
+          return writedTreeSha;
+      })
+
+      return Commit.create(newTree, [oldTreeCommit, newRootCommit], tesli);
+    });
+  }
 }
+
+var git = mygit(argv.gitDir + '/.git');
+var rootTreeSha = argv._;
+var tesliPath = path.resolve(argv.tesli);
+
+var main = async function(){
+
+  
+  return await Commit.create(Tree.of({
+    'ჰელლო': 'ვორლდ',
+    'აი': 'ია',
+    'აქ': {
+      'აც': 'ია'
+    }
+  })).getSha(git);
+};
+
+main()
+    .then((sha) => console.log(sha))
+    .catch(function(err){
+      console.log(argv);
+      process.nextTick(function(){
+        throw err;
+      });
+    });
+return;
+// var ფესვი_ხე = new ხე(new Commit(argv.p));
+
+// var ახალი_ხე = ფესვი_ხე.გამოხშირე()
+//   .getCommit(function(rootCommit, Tesli){
+
+//     return {};
+//   });
+
+// ახალი_ხე.getSha(git)

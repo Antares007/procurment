@@ -11,7 +11,7 @@ var {AStream} = require('./astream.js');
 var debug = require('debug')('mygit');
 
 module.exports = function gitStreamer(gitDir) {
-  var gitCmdBase = `git --git-dir=${gitDir} `;
+  var gitCmdBase = gitDir ? `git --git-dir=${gitDir} ` : 'git ';
 
   var git = function (cmd, mappers, options, cb) {
     if(typeof options === 'function') {
@@ -31,7 +31,7 @@ module.exports = function gitStreamer(gitDir) {
   };
   var spawn = function(args, options){
     var spawn = require('child_process').spawn;
-    var args2 = [`--git-dir=${gitDir}`].concat(args);
+    var args2 = gitDir ? [`--git-dir=${gitDir}`].concat(args) : args;
     debug('git ' + args2.join(' ') + ' ' + JSON.stringify(options));
     return spawn('git', args2, options);
   }
@@ -107,6 +107,31 @@ module.exports = function gitStreamer(gitDir) {
     mktree: function(entries, cb) {
       var data = entries.map(e => `${e.mode} ${e.type} ${e.sha}\t${e.name}`).join('\n');
       git('mktree --missing', [mappers.trimOutput], cb).stdin.end(data, 'utf8');
+    },
+    commitTree: function(treeSha, parentShas, cb) {
+      var parents = parentShas.length > 0 ? '-p ' + parentShas.join(' -p ') : '';
+      git('commit-tree -m "c" ' + parents + ' ' + treeSha, [mappers.trimOutput], cb);
+    },
+    getCommit: function(sha, cb) {
+      var self = this;
+      git(
+        'cat-file -p ' + sha,
+        [stdout => stdout.split('\n').reduce((cobj, line) => {
+          if(cobj.done){
+            return cobj;
+          }
+          if(line.indexOf('tree ') === 0){
+            cobj.tree = line.slice(5).trim();
+          } else if(line.indexOf('parent ') === 0){
+            cobj.parents = (cobj.parents || []).concat(line.slice(7).trim())
+          } else {
+            cobj.done = true;
+          }
+          return cobj;
+        }, {})],
+        { encoding: 'binary', timeout: 0, maxBuffer: 1000*1024, killSignal: 'SIGTERM' },
+        cb
+      );
     },
     getBlob: function(sha, cb) {
       var self = this;
@@ -247,6 +272,8 @@ function denodeifyApi(mygit){
   var git = [
     'revParse',
     'lsTree',
+    'commitTree',
+    'getCommit',
     'mktree',
     'hashObject'
   ].reduce((s, x) => (s[x] = denodeify(mygit[x]), s), {});
@@ -285,7 +312,7 @@ function denodeifyApi(mygit){
   };
 
   git.mkDeepTree = async function(baseTree, patchStream){
-    var indexFileName = 'index' + process.pid + '.' + (indexInfoId++) + '.tmp';
+    var indexFileName = '/tmp/git-index-' + process.pid + '.' + (indexInfoId++) + '.tmp';
     var index = git.openIndex(indexFileName);
     await index.readTree(baseTree);
     var indexInfo = index.createUpdateIndexInfoStream();
