@@ -39,10 +39,10 @@ module.exports = function gitStreamer(gitDir) {
   var mappers = {
     parseDiffLine: function(x){
       var [rest, path] = x.split('\t');
-      var [_, mode, oldSha, newSha, status] = rest.split(' ');
-      if(newSha * 1 === 0) return { path, status, oldSha, mode };
-      if(oldSha * 1 === 0) return { path, status, newSha, mode };
-      return { path, status, newSha, oldSha, mode };
+      var [oldMode, newMode, oldSha, newSha, status] = rest.split(' ');
+      if(newSha * 1 === 0) return { path, status, oldSha, oldMode };
+      if(oldSha * 1 === 0) return { path, status, newSha, newMode };
+      return { path, status, newSha, oldSha, newMode, oldMode };
     },
     parseDiffOutput: function(stdout){
       return stdout.split('\n')
@@ -83,8 +83,9 @@ module.exports = function gitStreamer(gitDir) {
         }
       }
     },
-    diffTree: function(tree1, tree2){
-      return new AStream(() => spawn(['diff-tree', '--raw', '-r', tree1, tree2]).stdout)
+    diffTree: function(tree1, tree2, args = ['--raw', '-r']){
+
+      return new AStream(() => spawn(['diff-tree'].concat(args, tree1, tree2)).stdout)
         .pipe(split())
         .transform(function(x, n){
           if(x){

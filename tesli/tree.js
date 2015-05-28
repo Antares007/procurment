@@ -5,7 +5,7 @@ var emptyTreeSha = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
 export class Tree extends GitObject {
   constructor(gitContext){
-    super(gitContext)
+    super(typeof gitContext === 'undefined' ? () => emptyTreeSha : gitContext);
   }
 
   get(path, nullValue){
@@ -15,7 +15,8 @@ export class Tree extends GitObject {
         var target = await git.revParse(sha + ':' + path);
         return target;
       } catch(ex){
-        if(ex.message.indexOf('does not exist in') >= 0){
+        if(ex.message.indexOf('does not exist in') >= 0 ||
+           ex.message.indexOf('exists on disk, but not in') >= 0){
           return await nullValue.getSha(git);
         }
         throw ex;
