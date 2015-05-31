@@ -26,7 +26,7 @@ export class Commit extends GitObject {
 
   grow(tesli){
     var fnToString = tesli.ფუნქცია.toString();
-    var message = tesli.სახეობა + '(' + hash(fnToString) + ')';
+    var message = tesli.სახეობა + '(' + tesli.ანაბეჭდი() + ')';
     return new Commit(async (git) => {
       var newRootCommit = await this.getSha(git);
       var [roots, oldStates] = await Promise.all([
