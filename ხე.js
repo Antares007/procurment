@@ -67,16 +67,7 @@ export class ხე {
               o[key] = value;
             }
           };
-          new Tree(async function(git) {
-            var oldRootSha = await oldRoot.getSha(git);
-            var newRootSha = await newRoot.getSha(git);
 
-            git.diffTree(oldRootSha, newRootSha).map(async (patch) => {
-              return ;
-            })
-
-            return;
-          });
           var tree = Object.keys(links).reduce(function(tree, path){
             rec(tree, path.split('/'), links[path]);
             return tree;
