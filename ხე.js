@@ -8,23 +8,23 @@ export class ხე {
     this.commit = commit;
   }
 
-  ჯგუფი(fn){
+  filter(fn){
     return new ხე(
       this.commit.grow({
         სახეობა: 'გადააწყე_საკრებებად',
-        ფუნქცია: function(oldRoot, newRoot, oldTree){
+        ფუნქცია: function (oldRoot, newRoot, oldTree) {
 
           return new Tree(async (git) => {
             
-            // git.diffTree(await oldRoot.getSha(git), await newRoot.getSha(git))
-            //   .map(x => JSON.stringify(x) + '\n')
-            //   .valueOf()
-            //   .pipe(process.stdout);
+            var patchStream = git.diffTree(await oldRoot.getSha(git), await newRoot.getSha(git))
+              .filter(x => fn(x.path))
+              // .map(x => (console.log(x), x))
+// [
+//               { mode: '100644', sha: 'c9be5a597abc5229e93acc4f2bfccc8cdaef5988', path: 'put your lights oh' }
+//             ]
+            var newTreeSha = await git.mkDeepTree(Tree.emptySha, patchStream)
 
-            console.log('აქ ვარ აქ');
-
-
-            return Tree.emptySha;
+            return newTreeSha;
           });
         },
         ანაბეჭდი(){

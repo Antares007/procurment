@@ -1,8 +1,5 @@
 var mkdirp = require('mkdirp');
-var zlib = require('zlib');
-var fs = require('fs');
 var path = require('path');
-var crypto = require('crypto');
 var stream = require('stream');
 var split = require('split');
 var transform = require('./transform.js');
@@ -68,7 +65,6 @@ module.exports = function gitStreamer(gitDir) {
           git('write-tree', [mappers.trimOutput], options, cb);
         },
         createUpdateIndexInfoStream: function(){
-
           var child = spawn(['update-index', '--index-info'], options);
           child.once('exit', function(){
             child.stdin.emit('child.exit');
@@ -79,6 +75,7 @@ module.exports = function gitStreamer(gitDir) {
           child.stderr.on('data', function(data){
             console.log('uiis stderr', data.toString());
           });
+          child.stdin.on('error', (err) => console.log(err))
           return child.stdin;
         }
       }
@@ -145,6 +142,9 @@ module.exports = function gitStreamer(gitDir) {
       );
     },
     hashObject: function(buffer, cb) {
+      var zlib = require('zlib');
+      var crypto = require('crypto');
+      var fs = require('fs');
 
       var shasum = crypto.createHash('sha1');
       var header = new Buffer("blob " + buffer.length + "\0");
@@ -304,10 +304,10 @@ function denodeifyApi(mygit){
 
   var indexInfoId = 0;
   var toIndexInfoLine = function(p){
-    var { path, status, newSha, mode, sha } = p;
+    var { path, status, newSha, mode, sha, newMode } = p;
     if(status){
       return status !== 'D'
-        ? `${mode} ${newSha}\t${path}\n`
+        ? `${newMode} ${newSha}\t${path}\n`
         : `0 0000000000000000000000000000000000000000\t${path}\n`;
     } else {
       return `${mode} ${sha}\t${path}\n`
@@ -321,13 +321,13 @@ function denodeifyApi(mygit){
     var indexInfo = index.createUpdateIndexInfoStream();
 
     if(Array.isArray(patchStream)){
-      var defer = Promise.defer();
-      indexInfo
-        .once('error', err => defer.reject(err))
-        .once('child.exit', () => defer.resolve())
-        .write(patchStream.map(toIndexInfoLine).join(''));
-      indexInfo.end();
-      await defer.promise;
+      await new Promise((resolve, reject) => {
+        indexInfo
+          .once('error', err => reject(err))
+          .once('child.exit', () => resolve())
+          .write(patchStream.map(toIndexInfoLine).join(''))
+        indexInfo.end()
+      })
     } else {
       await patchStream
         .map(toIndexInfoLine)

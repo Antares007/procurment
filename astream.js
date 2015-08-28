@@ -19,14 +19,12 @@ export class AStream {
   }
 
   writeTo(writable){
-    var defer = Promise.defer();
-    this.valueOf()
-      .on('error', err => defer.reject(err))
+    return new Promise((resolve, reject) => this.valueOf()
+      .on('error', err => reject(err))
       .pipe(writable)
-      .on('error', err => defer.reject(err))
-      .on('child.exit', () => defer.resolve());
+      .on('error', err => reject(err))
+      .on('child.exit', () => resolve()))
       // TODO: after finish index is still locked. wait process to exit
-    return defer.promise;
   }
 
   pipe(stream){

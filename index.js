@@ -1,5 +1,4 @@
 'use strict';
-
 // enables JSX requires
 require("babel/register")({ extensions: [".es6", ".es", ".jsx", ".js"] });
 
