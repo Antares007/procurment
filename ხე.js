@@ -18,11 +18,7 @@ export class ხე {
             
             var patchStream = git.diffTree(await oldRoot.getSha(git), await newRoot.getSha(git))
               .filter(x => fn(x.path))
-              // .map(x => (console.log(x), x))
-// [
-//               { mode: '100644', sha: 'c9be5a597abc5229e93acc4f2bfccc8cdaef5988', path: 'put your lights oh' }
-//             ]
-            var newTreeSha = await git.mkDeepTree(Tree.emptySha, patchStream)
+            var newTreeSha = await git.mkDeepTree(await oldTree.getSha(git), patchStream)
 
             return newTreeSha;
           });

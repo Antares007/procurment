@@ -127,7 +127,7 @@ module.exports = function gitStreamer(gitDir) {
             cobj.done = true;
           }
           return cobj;
-        }, {})],
+        }, { sha: sha })],
         { encoding: 'binary', timeout: 0, maxBuffer: 1000*1024, killSignal: 'SIGTERM' },
         cb
       );
