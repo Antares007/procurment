@@ -24,7 +24,7 @@ export class ხე {
           });
         },
         ანაბეჭდი(){
-          return hash(this.ფუნქცია.toString())
+          return hash(this.ფუნქცია.toString() + fn.toString())
         }
       })
     );
