@@ -1,8 +1,14 @@
+var shaRegex = /^[0123456789abcdef]{40}$/
+
 export class GitObject {
 
   constructor (shaFn) {
     if (typeof shaFn === 'string') {
-      this.shaFn = (git) => git.revParse(shaFn)
+      if (shaRegex.test(shaFn)) {
+        this.shaFn = (git) => shaFn
+      } else {
+        this.shaFn = (git) => git.revParse(shaFn)
+      }
     } else {
       this.shaFn = shaFn
     }
