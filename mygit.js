@@ -342,5 +342,23 @@ function denodeifyApi(mygit){
     return sha;
   }
 
+  git.revListWalk = async function (fn, commitSha, skip = 0) {
+    var rez = await git.exec(
+      `rev-list --skip=${skip} --max-count=10 --pretty=oneline ${commitSha}`,
+      [x => x.split('\n').slice(0, -1).map(x => ({sha: x.slice(0, 40), message: x.slice(41)}))]
+    )
+    if(rez.length === 0) return
+
+    while(rez.length !== 0){
+      var cmt = rez.shift()
+      var retValue = fn(cmt)
+      if(typeof retValue !== 'undefined'){
+        return retValue
+      }
+    }
+
+    return await git.revListWalk(fn, commitSha, skip + 10)
+  }
+
   return git;
 }

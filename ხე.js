@@ -2,103 +2,94 @@ var crypto = require('crypto');
 var Tree = require('./tesli/tree').Tree,
   Commit = require('./tesli/commit').Commit,
   Blob = require('./tesli/blob').Blob;
+var debug = require('debug')('khe');
 
 export class ხე {
   constructor(commit){
     this.commit = commit;
   }
 
-  filter(fn){
-    return new ხე(
-      this.commit.grow({
-        სახეობა: 'გადააწყე_საკრებებად',
-        ფუნქცია: function (oldRoot, newRoot, oldTree) {
-
-          return new Tree(async (git) => {
-            
-            var patchStream = git.diffTree(await oldRoot.getSha(git), await newRoot.getSha(git))
-              .filter(x => fn(x.path))
-            var newTreeSha = await git.mkDeepTree(await oldTree.getSha(git), patchStream)
-
-            return newTreeSha;
-          });
-        },
-        ანაბეჭდი(){
-          return hash(this.ფუნქცია.toString() + fn.toString())
-        }
-      })
-    );
+  filter(fn) {
+    return this.grow(
+      function(oldRoot, newRoot, oldTree) {
+        return new Tree(async (git) => {
+          var diff = git.diffTree(await oldRoot.getSha(git), await newRoot.getSha(git))
+          var patchStream = diff.filter(x => fn(x.path))
+          var newTreeSha = await git.mkDeepTree(await oldTree.getSha(git), patchStream)
+          return newTreeSha
+        })
+      },
+      'filter'
+    )
   }
 
-  ამოკრიბე(fn){
-    return new ხე(
-      this.commit.grow({
-        სახეობა: 'ამოკრიბე',
-        ფუნქცია: function(oldRoot, newRoot, oldTree){
-          return oldTree;
-        },
-        საწყისი_მდგომარეობა: Tree.of({}),
-        ანაბეჭდი(){
-          return hash(this.ფუნქცია.toString())
-        }
-      })
-    );
-  }
-
-  გამოარჩიე(links){
-    return new ხე(
-      this.commit.grow({
-        სახეობა: 'გამოარჩიე',
-        ფუნქცია: function(oldRoot, newRoot, oldTree){
-          if(typeof links === 'string'){
-            return newRoot.get(links, new Tree());
-          }
-
-          var rec = function(o, paths, value){
-            var key = paths.shift();
-            if(paths.length > 0){
-              o[key] = o[key] || {};
-              rec(o[key], paths, value)
-            } else {
-              o[key] = value;
+  orderBy(fn) {
+    var reorder = function(baseCommit, newRootCommit) {
+      return new Commit(async git => {
+        var commit = (await git.diffTree(
+            await baseCommit.getTree().getSha(git),
+            await newRootCommit.getTree().getSha(git)
+        ) .reduce((state, patch) => {
+            var sortValue = fn(patch.path)
+            state[sortValue] = (state[sortValue] || []).concat(patch)
+            return state
+          }, {})
+          .transform(function(state, next) {
+            for(var key of Object.keys(state).sort((a,b) => a < b ? -1 : (a > b ? 1 : 0))) {
+              var patchs = state[key]
+              this.push({key, patchs})
             }
-          };
+            next()
+          })
+          .reduce(
+            (state, x) => Commit.create(state.getTree().applyPatch(x.patchs), [state], x.key),
+            baseCommit
+          )
+          .toArray())[0]
+        return await (commit.getSha(git))
+      })
+    }
+    var newTreeCommit = this.commit.grow(
+      (newRootCommit) => reorder(Commit.create(new Tree(), [], ''), newRootCommit),
+      (oldRootCommit, newRootCommit, oldTreeCommit) => new Commit(async git => {
+        var minValue = (await git.diffTree(
+            await oldRootCommit.getTree().getSha(git),
+            await newRootCommit.getTree().getSha(git)
+        ) .map(patch => fn(patch.path))
+          .reduce((state, x) => state > x ? x : state, '\uffff')
+          .toArray())[0]
 
-          var tree = Object.keys(links).reduce(function(tree, path){
-            rec(tree, path.split('/'), links[path]);
-            return tree;
-          }, {});
+        var baseCommit =  await git.revListWalk(
+          (cmt) => cmt.message < minValue || cmt.message === '' ? new Commit(cmt.sha) : undefined,
+          await oldTreeCommit.getSha(git)
+        )
+        return await reorder(baseCommit, newRootCommit).getSha(git)
+      })
+    )
 
-          return Tree.of(tree);
+    return new ხე(newTreeCommit)
+  }
+
+  grow(seed, identity) {
+    var message = identity
+    return new ხე(
+      this.commit.grow(
+        function (newRootCommit) {
+          return Commit.create(
+            seed(new Tree(), newRootCommit.getTree(), new Tree()),
+            [],
+            message
+          )
         },
-        ანაბეჭდი(){
-          return hash(this.ფუნქცია.toString())
+        function (oldRootCommit, newRootCommit, oldTreeCommit) {
+          return Commit.create(
+            seed(oldRootCommit.getTree(), newRootCommit.getTree(), oldTreeCommit.getTree()),
+            [oldTreeCommit, newRootCommit],
+            message
+          )
         }
-      })
-    );
-  }
-
-  გაზარდე(fn){
-    return new ხე(
-      this.commit.grow({
-        სახეობა: 'გაზარდე',
-        ფუნქცია: fn,
-        საწყისი_მდგომარეობა: Tree.of({})
-      })
-    );
-  }
-
-  გამოხშირე(fn){
-    return new ხე(
-      this.commit.grow({
-        სახეობა: 'გამოხშირე',
-        ფუნქცია: function(oldRoot, newRoot, oldTree){
-          return oldTree.cd(function(){
-          });
-        },
-        საწყისი_მდგომარეობა: Tree.of({})
-      })
-    );
+      )
+    )
   }
 }
 

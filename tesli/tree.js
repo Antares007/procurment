@@ -24,6 +24,12 @@ export class Tree extends GitObject {
     })
   }
 
+  applyPatch (patchs) {
+    return new Tree(async (git) => {
+      return await git.mkDeepTree(await this.getSha(git), patchs)
+    })
+  }
+
   cd (fn) {
     return new Tree(async (git) => {
       var tree = (await git.lsTree(await this.getSha(git))).reduce(function (tree, entry) {

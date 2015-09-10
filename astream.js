@@ -18,6 +18,15 @@ export class AStream {
     return this.readableStreamFactory();
   }
 
+  toArray(writable){
+    var array = []
+    return new Promise((resolve, reject) => this.valueOf()
+      .on('data', data => array.push(data))
+      .on('error', err => reject(err))
+      .on('end', () => resolve(array))
+    )
+  }
+
   writeTo(writable){
     return new Promise((resolve, reject) => this.valueOf()
       .on('error', err => reject(err))
