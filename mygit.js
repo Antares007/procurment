@@ -115,19 +115,23 @@ module.exports = function gitStreamer(gitDir) {
       var self = this;
       git(
         'cat-file -p ' + sha,
-        [stdout => stdout.split('\n').reduce((cobj, line) => {
-          if(cobj.done){
+        [stdout => {
+          var headerEnd = stdout.indexOf('\n\n')
+          var header = stdout.slice(0, headerEnd)
+          var message = stdout.slice(headerEnd + 2, -1)
+          return header.split('\n').reduce((cobj, line) => {
+            if(line.indexOf('tree ') === 0){
+              cobj.tree = line.slice(5);
+            } else if(line.indexOf('parent ') === 0){
+              cobj.parents = (cobj.parents || []).concat(line.slice(7))
+            } else if(line.indexOf('author ') === 0){
+              cobj.author = line.slice(7)
+            } else if(line.indexOf('committer ') === 0){
+              cobj.committer = line.slice(10)
+            }
             return cobj;
-          }
-          if(line.indexOf('tree ') === 0){
-            cobj.tree = line.slice(5).trim();
-          } else if(line.indexOf('parent ') === 0){
-            cobj.parents = (cobj.parents || []).concat(line.slice(7).trim())
-          } else {
-            cobj.done = true;
-          }
-          return cobj;
-        }, { sha: sha })],
+          }, {sha, message})
+        }],
         { encoding: 'binary', timeout: 0, maxBuffer: 1000*1024, killSignal: 'SIGTERM' },
         cb
       );
