@@ -19,7 +19,7 @@ export class ხე {
           return newTreeSha
         })
       },
-      'filter'
+      `filter(${hash(fn.toString())})`
     )
   }
 
@@ -64,7 +64,8 @@ export class ხე {
           await oldTreeCommit.getSha(git)
         )
         return await reorder(baseCommit, newRootCommit).getSha(git)
-      })
+      }),
+      `orderBy(${hash(fn.toString())})`
     )
 
     return new ხე(newTreeCommit)
@@ -87,7 +88,8 @@ export class ხე {
             [oldTreeCommit, newRootCommit],
             message
           )
-        }
+        },
+        identity
       )
     )
   }

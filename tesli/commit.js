@@ -19,13 +19,30 @@ export class Commit extends GitObject {
     })
   }
 
-  grow (fn1, fn2) {
+  grow (fn1, fn2, seedId) {
     return new Commit(async git => {
-      var thisCommit = await git.getCommit(await this.getSha(git))
-      var newTreeCommit = thisCommit.parents
-        ? fn2(new Commit(thisCommit.parents[0]), this, new Commit(thisCommit.parents[0]).grow(fn1, fn2))
-        : fn1(this)
-      return await newTreeCommit.getSha(git)
+
+      var growTree = async function(rootSha) {
+
+        var cachedRez = git.getTreeFromCache(rootSha, seedId)
+        if(cachedRez) return cachedRez
+
+        var thisCommit = await git.getCommit(rootSha)
+        var newTreeCommit = thisCommit.parents
+          ? fn2(
+              new Commit(thisCommit.parents[0]),
+              new Commit(thisCommit.sha),
+              new Commit(await growTree(thisCommit.parents[0]))
+            )
+          : fn1(new Commit(thisCommit.sha))
+        var newTreeSha = await newTreeCommit.getSha(git) 
+
+        git.setTreeCache(rootSha, seedId, newTreeSha)
+
+        return newTreeSha
+      }
+
+      return await growTree(await this.getSha(git))
     })
   }
 }
