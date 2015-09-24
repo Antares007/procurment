@@ -9,6 +9,68 @@ export class ხე {
     this.commit = commit;
   }
 
+  reduce(fn) {
+    var _reduce = function (tree, key) {
+      return tree.toBlob(function (buffers) {
+        var values = buffers.map(x => JSON.parse(x))
+        var value = fn(values, key)
+        return new Buffer(JSON.stringify(value))
+      })
+    }
+    return this.grow(
+      (oldRoot, newRoot, oldTree) => new Tree(async git => {
+        var patchStream = await git.diffTree(await oldRoot.getSha(git), await newRoot.getSha(git), ['--raw'])
+          .transform(async function (x) {
+            var key = new Buffer(x.path, 'base64').toString('utf8')
+            var isDeleted = x.status === 'D'
+            this.push({
+              newMode: '100644',
+              status: isDeleted ? 'D' : 'A',
+              path: x.path,
+              newSha: isDeleted ? undefined : await _reduce(new Tree(x.newSha), key).getSha(git)
+            })
+          })
+        return await git.mkDeepTree(await oldTree.getSha(git), patchStream)
+      }),
+      `reduce(${hash(fn.toString())})`
+    )
+  }
+
+  map(fn) {
+    return this.grow(
+      function(oldRoot, newRoot, oldTree) {
+        return new Tree(async (git) => {
+          var diff = git.diffTree(await oldRoot.getSha(git), await newRoot.getSha(git))
+          var patchStream = diff.transform(async function (patch) {
+            // var batchCat = git.catFileBatch()
+            var ds = this
+            var mkMaper = function () {
+              var i = 0
+              return function (buffer, status) {
+                fn.call(
+                  { emit: (key, value) => ds.push({ status, path: new Buffer(key).toString('base64') + '/' + hash(patch.path + (i++).toString()), value }) },
+                  buffer,
+                  patch.path
+                )
+              }
+            }
+            if (patch.oldSha) mkMaper()(await git.cat(patch.oldSha), 'D')
+            if (patch.newSha) mkMaper()(await git.cat(patch.newSha), 'A')
+            // batchCat.end()
+          }).transform(async function (x) {
+            var sha = await git.hashObject(new Buffer(JSON.stringify(x.value)))
+            x[x.status === 'A' ? 'newSha' : 'oldSha'] = sha
+            x[x.status === 'A' ? 'newMode' : 'oldMode'] = '100644'
+            this.push(x)
+          })
+          var newTreeSha = await git.mkDeepTree(await oldTree.getSha(git), patchStream)
+          return newTreeSha
+        })
+      },
+      `map(${hash(fn.toString())})`
+    )
+  }
+
   filter(fn) {
     return this.grow(
       function(oldRoot, newRoot, oldTree) {
