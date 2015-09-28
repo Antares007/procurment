@@ -138,18 +138,14 @@ export class ხე {
     return new ხე(
       this.commit.grow(
         function (newRootCommit) {
-          return Commit.create(
-            seed(new Tree(), newRootCommit.getTree(), new Tree()),
-            [],
-            message
-          )
+          var newTree = seed(new Tree(), newRootCommit.getTree(), new Tree())
+          var newTreeCommit = Commit.create(newTree, [], message)
+          return new Commit(async git => await newTreeCommit.getSha(git))
         },
         function (oldRootCommit, newRootCommit, oldTreeCommit) {
-          return Commit.create(
-            seed(oldRootCommit.getTree(), newRootCommit.getTree(), oldTreeCommit.getTree()),
-            [oldTreeCommit, newRootCommit],
-            message
-          )
+          var newTree = seed(oldRootCommit.getTree(), newRootCommit.getTree(), oldTreeCommit.getTree())
+          var newTreeCommit = Commit.create(newTree, [oldTreeCommit, newRootCommit], message)
+          return new Commit(async git => await newTreeCommit.getSha(git))
         },
         identity
       )

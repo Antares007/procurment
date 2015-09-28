@@ -19,14 +19,10 @@ export class Commit extends GitObject {
     })
   }
 
-  grow (fn1, fn2, seedId) {
+  grow (fn1, fn2) {
     return new Commit(async git => {
 
       var growTree = async function(rootSha) {
-
-        var cachedRez = git.getTreeFromCache(rootSha, seedId)
-        if(cachedRez) return cachedRez
-
         var thisCommit = await git.getCommit(rootSha)
         var newTreeCommit = thisCommit.parents
           ? fn2(
@@ -35,11 +31,7 @@ export class Commit extends GitObject {
               new Commit(await growTree(thisCommit.parents[0]))
             )
           : fn1(new Commit(thisCommit.sha))
-        var newTreeSha = await newTreeCommit.getSha(git) 
-
-        git.setTreeCache(rootSha, seedId, newTreeSha)
-
-        return newTreeSha
+        return await newTreeCommit.getSha(git)
       }
 
       return await growTree(await this.getSha(git))
