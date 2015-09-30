@@ -1,17 +1,16 @@
 var { GitObject } = require('./gitobject')
 var { Tree } = require('./tree')
-var debug = require('debug')('commit');
 
 export class Commit extends GitObject {
   constructor (gitContext) {
     super(gitContext)
   }
 
-  getTree() {
+  getTree () {
     return new Tree(async git => (await this.getSha(git)) + `^{tree}`)
   }
 
-  static create (tree, parents=[], message='') {
+  static create (tree, parents = [], message = '') {
     return new Commit(async (git) => {
       var treeSha = await tree.getSha(git)
       var parentShas = await Promise.all(parents.map(p => p.getSha(git)))
@@ -21,7 +20,6 @@ export class Commit extends GitObject {
 
   grow (fn1, fn2) {
     return new Commit(async git => {
-
       var growTree = async function(rootSha) {
         var thisCommit = await git.getCommit(rootSha)
         var newTreeCommit = thisCommit.parents

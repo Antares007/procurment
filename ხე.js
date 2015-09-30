@@ -1,15 +1,15 @@
-var crypto = require('crypto');
-var Tree = require('./tesli/tree').Tree,
-  Commit = require('./tesli/commit').Commit,
-  Blob = require('./tesli/blob').Blob;
-var debug = require('debug')('khe');
+var crypto = require('crypto')
+var Tree = require('./tesli/tree').Tree
+var Commit = require('./tesli/commit').Commit
+// var debug = require('debug')('khe')
 
 export class ხე {
-  constructor(commit){
-    this.commit = commit;
+
+  constructor (commit) {
+    this.commit = commit
   }
 
-  reduce(fn) {
+  reduce (fn) {
     var _reduce = function (tree, key) {
       return tree.toBlob(function (buffers) {
         var values = buffers.map(x => JSON.parse(x))
@@ -36,9 +36,9 @@ export class ხე {
     )
   }
 
-  map(fn) {
+  map (fn) {
     return this.grow(
-      function(oldRoot, newRoot, oldTree) {
+      function (oldRoot, newRoot, oldTree) {
         return new Tree(async (git) => {
           var diff = git.diffTree(await oldRoot.getSha(git), await newRoot.getSha(git))
           var patchStream = diff.transform(async function (patch) {
@@ -71,9 +71,9 @@ export class ხე {
     )
   }
 
-  filter(fn) {
+  filter (fn) {
     return this.grow(
-      function(oldRoot, newRoot, oldTree) {
+      function (oldRoot, newRoot, oldTree) {
         return new Tree(async (git) => {
           var diff = git.diffTree(await oldRoot.getSha(git), await newRoot.getSha(git))
           var patchStream = diff.filter(x => fn(x.path))
@@ -85,29 +85,29 @@ export class ხე {
     )
   }
 
-  orderBy(fn) {
-    var reorder = function(baseCommit, newRootCommit) {
+  orderBy (fn) {
+    var reorder = function (baseCommit, newRootCommit) {
       return new Commit(async git => {
         var commit = (await git.diffTree(
-            await baseCommit.getTree().getSha(git),
-            await newRootCommit.getTree().getSha(git)
-        ) .reduce((state, patch) => {
-            var sortValue = fn(patch.path)
-            state[sortValue] = (state[sortValue] || []).concat(patch)
-            return state
-          }, {})
-          .transform(function(state, next) {
-            for(var key of Object.keys(state).sort((a,b) => a < b ? -1 : (a > b ? 1 : 0))) {
-              var patchs = state[key]
-              this.push({key, patchs})
-            }
-            next()
-          })
-          .reduce(
-            (state, x) => Commit.create(state.getTree().applyPatch(x.patchs), [state], x.key),
+          await baseCommit.getTree().getSha(git),
+          await newRootCommit.getTree().getSha(git)
+        ).reduce((state, patch) => {
+          var sortValue = fn(patch.path)
+          state[sortValue] = (state[sortValue] || []).concat(patch)
+          return state
+        }, {})
+        .transform(function (state, next) {
+          for (var key of Object.keys(state).sort((a, b) => a < b ? -1 : (a > b ? 1 : 0))) {
+            var patchs = state[key]
+            this.push({key, patchs})
+          }
+          next()
+        })
+        .reduce(
+          (state, x) => Commit.create(state.getTree().applyPatch(x.patchs), [state], x.key),
             baseCommit
-          )
-          .toArray())[0]
+        )
+        .toArray())[0]
         return await (commit.getSha(git))
       })
     }
@@ -121,7 +121,7 @@ export class ხე {
           .reduce((state, x) => state > x ? x : state, '\uffff')
           .toArray())[0]
 
-        var baseCommit =  await git.revListWalk(
+        var baseCommit = await git.revListWalk(
           (cmt) => cmt.message < minValue || cmt.message === '' ? new Commit(cmt.sha) : undefined,
           await oldTreeCommit.getSha(git)
         )
@@ -133,7 +133,7 @@ export class ხე {
     return new ხე(newTreeCommit)
   }
 
-  grow(seed, identity) {
+  grow (seed, identity) {
     var message = identity
     return new ხე(
       this.commit.grow(
@@ -153,8 +153,8 @@ export class ხე {
   }
 }
 
-function hash(value){
-  var shasum = crypto.createHash('sha1');
-  shasum.update(value.toString());
-  return shasum.digest('hex');
+function hash (value) {
+  var shasum = crypto.createHash('sha1')
+  shasum.update(value.toString())
+  return shasum.digest('hex')
 }
