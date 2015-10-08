@@ -6,6 +6,10 @@ export class Commit extends GitObject {
     super(gitContext)
   }
 
+  getParent (index = 0) {
+    return new Commit(async git => `${ await this.getSha(git) }^${ index + 1 }`)
+  }
+
   getTree () {
     return new Tree(async git => (await this.getSha(git)) + `^{tree}`)
   }

@@ -1,11 +1,12 @@
 var crypto = require('crypto')
 var Tree = require('./tesli/tree').Tree
+// var Blob = require('./tesli/tree').Blob
 var Commit = require('./tesli/commit').Commit
 // var debug = require('debug')('khe')
 
 export class ხე {
 
-  constructor (commit) {
+  constructor (commit, differ) {
     this.commit = commit
   }
 
@@ -42,13 +43,11 @@ export class ხე {
         return new Tree(async (git) => {
           var diff = git.diffTree(await oldRoot.getSha(git), await newRoot.getSha(git))
           var patchStream = diff.transform(async function (patch) {
-            // var batchCat = git.catFileBatch()
             var ds = this
             var mkMaper = function () {
-              var i = 0
               return function (buffer, status) {
                 fn.call(
-                  { emit: (key, value) => ds.push({ status, path: new Buffer(key).toString('base64') + '/' + hash(patch.path + (i++).toString()), value }) },
+                  { emit: (key, value) => ds.push({ status, path: key, value }) },
                   buffer,
                   patch.path
                 )
@@ -58,7 +57,7 @@ export class ხე {
             if (patch.newSha) mkMaper()(await git.cat(patch.newSha), 'A')
             // batchCat.end()
           }).transform(async function (x) {
-            var sha = await git.hashObject(new Buffer(JSON.stringify(x.value)))
+            var sha = await git.hashObject(x.value)
             x[x.status === 'A' ? 'newSha' : 'oldSha'] = sha
             x[x.status === 'A' ? 'newMode' : 'oldMode'] = '100644'
             this.push(x)
@@ -91,8 +90,11 @@ export class ხე {
         var commit = (await git.diffTree(
           await baseCommit.getTree().getSha(git),
           await newRootCommit.getTree().getSha(git)
-        ).reduce((state, patch) => {
-          var sortValue = fn(patch.path)
+        ).transform(async function (patch) {
+          this.push({ sortValue: fn(await git.cat(patch.newSha), patch.path), patch })
+        })
+        .reduce((state, x) => {
+          var { sortValue, patch } = x
           state[sortValue] = (state[sortValue] || []).concat(patch)
           return state
         }, {})
@@ -114,18 +116,26 @@ export class ხე {
     var newTreeCommit = this.commit.grow(
       (newRootCommit) => reorder(Commit.create(new Tree(), [], ''), newRootCommit),
       (oldRootCommit, newRootCommit, oldTreeCommit) => new Commit(async git => {
-        var minValue = (await git.diffTree(
-            await oldRootCommit.getTree().getSha(git),
-            await newRootCommit.getTree().getSha(git)
-        ) .map(patch => fn(patch.path))
-          .reduce((state, x) => state > x ? x : state, '\uffff')
-          .toArray())[0]
-
-        var baseCommit = await git.revListWalk(
-          (cmt) => cmt.message < minValue || cmt.message === '' ? new Commit(cmt.sha) : undefined,
-          await oldTreeCommit.getSha(git)
-        )
-        return await reorder(baseCommit, newRootCommit).getSha(git)
+        var isAppendOnly = async function (tree1, tree2) {
+          var rez = await git.diffTree(await tree1.getSha(git), await tree2.getSha(git), ['--raw'])
+            .transform(function (patch, next) {
+              if (patch.status !== 'A') {
+                this.push(false)
+                this.push(null)
+              } else {
+                next()
+              }
+            }).toArray()
+          return rez.length === 0
+        }
+        var findBaseCommit = async function (commit) {
+          if (await isAppendOnly(commit.getTree(), newRootCommit.getTree())) {
+            return commit
+          } else {
+            return await findBaseCommit(commit.getParent())
+          }
+        }
+        return await reorder(await findBaseCommit(oldTreeCommit), newRootCommit).getSha(git)
       }),
       `orderBy(${hash(fn.toString())})`
     )
