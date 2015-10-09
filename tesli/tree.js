@@ -8,6 +8,13 @@ export class Tree extends GitObject {
     super(typeof gitContext === 'undefined' ? () => emptyTreeSha : gitContext)
   }
 
+  getBlob (path) {
+    return new Blob(async (git) => {
+      var sha = await this.getSha(git)
+      return await git.revParse(sha + ':' + path)
+    })
+  }
+
   get (path, nullValue) {
     return new Tree(async (git) => {
       var sha = await this.getSha(git)
@@ -21,6 +28,13 @@ export class Tree extends GitObject {
         }
         throw ex
       }
+    })
+  }
+
+  merge (tree1, tree2, fn) {
+    return new Tree(async (git) => {
+      var patchStream = git.diffTree(await tree1.getSha(git), await tree2.getSha(git))
+      return await git.mkDeepTree(await this.getSha(git), fn(patchStream))
     })
   }
 

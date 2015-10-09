@@ -1,6 +1,6 @@
 var crypto = require('crypto')
 var Tree = require('./tesli/tree').Tree
-// var Blob = require('./tesli/tree').Blob
+var Blob = require('./tesli/blob').Blob
 var Commit = require('./tesli/commit').Commit
 // var debug = require('debug')('khe')
 
@@ -10,39 +10,71 @@ export class ხე {
     this.commit = commit
   }
 
-  reduce (fn) {
-    var _reduce = function (tree, key) {
-      return tree.toBlob(function (buffers) {
-        var values = buffers.map(x => JSON.parse(x))
-        var value = fn(values, key)
-        return new Buffer(JSON.stringify(value))
-      })
-    }
+  select (path) {
     return this.grow(
-      (oldRoot, newRoot, oldTree) => new Tree(async git => {
-        var patchStream = await git.diffTree(await oldRoot.getSha(git), await newRoot.getSha(git), ['--raw'])
-          .transform(async function (x) {
-            var key = new Buffer(x.path, 'base64').toString('utf8')
-            var isDeleted = x.status === 'D'
-            this.push({
-              newMode: '100644',
-              status: isDeleted ? 'D' : 'A',
-              path: x.path,
-              newSha: isDeleted ? undefined : await _reduce(new Tree(x.newSha), key).getSha(git)
-            })
-          })
-        return await git.mkDeepTree(await oldTree.getSha(git), patchStream)
-      }),
-      `reduce(${hash(fn.toString())})`
+      function (oldRoot, newRoot, oldTree) {
+        return newRoot.get(path, new Tree())
+      },
+      `select(${path})`
     )
   }
 
+  reduce (fn, initialState) {
+    fn = purify(fn)
+    var mkTree = function (initialState, oldRoot, newRoot, oldTree) {
+      return new Tree(async git => {
+        initialState = JSON.parse((await git.cat(await initialState.getSha(git))).toString())
+        return await oldTree.merge(oldRoot, newRoot, x => x.transform(async function (patch) {
+          initialState = fn.call(
+            {
+              emit: (path, buffer) => this.push({ path, buffer })
+            },
+            initialState,
+            await git.cat(patch.newSha),
+            patch.path
+          )
+        }).transform(async function (x) {
+          this.push({
+            newMode: '100644',
+            status: 'A',
+            path: 'data/' + x.path,
+            newSha: await git.hashObject(x.buffer)
+          })
+        })).getSha(git)
+      }).cd(function () {
+        this['state.json'] = Blob.of(initialState)
+      })
+    }
+    return this._grow(
+      (newRootCommit) =>
+        Commit.create(
+          mkTree(
+            Blob.of(initialState),
+            new Tree(),
+            newRootCommit.getTree(),
+            new Tree()
+          ),
+          [],
+          ''),
+      (oldRootCommit, newRootCommit, oldTreeCommit) =>
+        Commit.create(
+          mkTree(
+            oldTreeCommit.getTree().getBlob('state.json'),
+            oldRootCommit.getTree(),
+            newRootCommit.getTree(),
+            oldTreeCommit.getTree()
+          ),
+          [oldTreeCommit]),
+      `reduce_${fn.id}`
+    ).select('data/')
+  }
+
   map (fn) {
+    fn = purify(fn)
     return this.grow(
       function (oldRoot, newRoot, oldTree) {
         return new Tree(async (git) => {
-          var diff = git.diffTree(await oldRoot.getSha(git), await newRoot.getSha(git))
-          var patchStream = diff.transform(async function (patch) {
+          return await oldTree.merge(oldRoot, newRoot, x => x.transform(async function (patch) {
             var ds = this
             var mkMaper = function () {
               return function (buffer, status) {
@@ -55,22 +87,20 @@ export class ხე {
             }
             if (patch.oldSha) mkMaper()(await git.cat(patch.oldSha), 'D')
             if (patch.newSha) mkMaper()(await git.cat(patch.newSha), 'A')
-            // batchCat.end()
           }).transform(async function (x) {
             var sha = await git.hashObject(x.value)
             x[x.status === 'A' ? 'newSha' : 'oldSha'] = sha
             x[x.status === 'A' ? 'newMode' : 'oldMode'] = '100644'
             this.push(x)
-          })
-          var newTreeSha = await git.mkDeepTree(await oldTree.getSha(git), patchStream)
-          return newTreeSha
+          })).getSha(git)
         })
       },
-      `map(${hash(fn.toString())})`
+      `map_${fn.id})`
     )
   }
 
   filter (fn) {
+    fn = purify(fn)
     return this.grow(
       function (oldRoot, newRoot, oldTree) {
         return new Tree(async (git) => {
@@ -80,11 +110,12 @@ export class ხე {
           return newTreeSha
         })
       },
-      `filter(${hash(fn.toString())})`
+      `filter${fn.id}`
     )
   }
 
   orderBy (fn) {
+    fn = purify(fn)
     var reorder = function (baseCommit, newRootCommit) {
       return new Commit(async git => {
         var commit = (await git.diffTree(
@@ -107,13 +138,13 @@ export class ხე {
         })
         .reduce(
           (state, x) => Commit.create(state.getTree().applyPatch(x.patchs), [state], x.key),
-            baseCommit
+          baseCommit
         )
         .toArray())[0]
         return await (commit.getSha(git))
       })
     }
-    var newTreeCommit = this.commit.grow(
+    return this._grow(
       (newRootCommit) => reorder(Commit.create(new Tree(), [], ''), newRootCommit),
       (oldRootCommit, newRootCommit, oldTreeCommit) => new Commit(async git => {
         var isAppendOnly = async function (tree1, tree2) {
@@ -137,27 +168,36 @@ export class ხე {
         }
         return await reorder(await findBaseCommit(oldTreeCommit), newRootCommit).getSha(git)
       }),
-      `orderBy(${hash(fn.toString())})`
+      `orderBy_${fn.id}`
     )
-
-    return new ხე(newTreeCommit)
   }
 
   grow (seed, identity) {
     var message = identity
+    return this._grow(
+      function (newRootCommit) {
+        var newTree = seed(new Tree(), newRootCommit.getTree(), new Tree())
+        var newTreeCommit = Commit.create(newTree, [], message)
+        return new Commit(async git => await newTreeCommit.getSha(git))
+      },
+      function (oldRootCommit, newRootCommit, oldTreeCommit) {
+        var newTree = seed(oldRootCommit.getTree(), newRootCommit.getTree(), oldTreeCommit.getTree())
+        var newTreeCommit = Commit.create(newTree, [oldTreeCommit, newRootCommit], message)
+        return new Commit(async git => await newTreeCommit.getSha(git))
+      },
+      identity
+    )
+  }
+
+  _grow (fn1, fn2, seedId) {
     return new ხე(
       this.commit.grow(
-        function (newRootCommit) {
-          var newTree = seed(new Tree(), newRootCommit.getTree(), new Tree())
-          var newTreeCommit = Commit.create(newTree, [], message)
-          return new Commit(async git => await newTreeCommit.getSha(git))
-        },
-        function (oldRootCommit, newRootCommit, oldTreeCommit) {
-          var newTree = seed(oldRootCommit.getTree(), newRootCommit.getTree(), oldTreeCommit.getTree())
-          var newTreeCommit = Commit.create(newTree, [oldTreeCommit, newRootCommit], message)
-          return new Commit(async git => await newTreeCommit.getSha(git))
-        },
-        identity
+        (newRootCommit) => new Commit(async git => {
+          return await fn1(newRootCommit).getSha(git)
+        }),
+        (oldRootCommit, newRootCommit, oldTreeCommit) => new Commit(async git => {
+          return await fn2(oldRootCommit, newRootCommit, oldTreeCommit).getSha(git)
+        })
       )
     )
   }
@@ -167,4 +207,54 @@ function hash (value) {
   var shasum = crypto.createHash('sha1')
   shasum.update(value.toString())
   return shasum.digest('hex')
+}
+
+function deserializefn (value) {
+  if (value && typeof value === 'string' && value.substr(0, 8) === 'function') {
+    var startBody = value.indexOf('{') + 1
+    var endBody = value.lastIndexOf('}')
+    var startArgs = value.indexOf('(') + 1
+    var endArgs = value.indexOf(')')
+    return new Function(value.substring(startArgs, endArgs), value.substring(startBody, endBody)) // eslint-disable-line
+  }
+}
+
+function purify_0 (fn) {
+  var fnStr = fn.toString()
+  var pureFn = deserializefn(fnStr)
+  pureFn.id = hash(fnStr)
+  return fn.length === 0 ? pureFn() : pureFn
+}
+
+var excelConverter = {
+  import: b => require('./xlsx-importer')(b),
+  export: ws => require('./xlsx-exporter')(ws)
+}
+var converters = {
+  'xlsx': excelConverter,
+  'xls': excelConverter,
+  'json': {
+    import: x => JSON.parse(x.toString()),
+    export: x => new Buffer(JSON.stringify(x))
+  },
+  'default': {
+    import: x => x,
+    export: x => x
+  }
+}
+
+function getConverter (path) {
+  var key = Object.keys(converters)
+    .filter(ext => path.lastIndexOf('.' + ext) === path.length - ext.length - 1)[0] || 'default'
+  return converters[key]
+}
+
+function purify (fn) {
+  fn = purify_0(fn)
+  var fn2 = function (...args) {
+    args = args.map(a => a instanceof Buffer ? getConverter(args[args.length - 1]).import(a) : a)
+    return fn.apply({ emit: (path, value) => this.emit(path, getConverter(path).export(value)) }, args)
+  }
+  fn2.id = fn.id
+  return fn2
 }

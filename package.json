@@ -23,6 +23,7 @@
     "request": "^2.55.0",
     "request-replay": "^0.3.0",
     "retry": "^0.6.1",
+    "xlsx": "^0.8.0",
     "yargs": "^3.7.2"
   },
   "devDependencies": {
