@@ -1,8 +1,7 @@
-var crypto = require('crypto')
 var Tree = require('./tesli/tree').Tree
 var Blob = require('./tesli/blob').Blob
 var Commit = require('./tesli/commit').Commit
-// var debug = require('debug')('khe')
+var purify = require('./purify')
 
 export class ხე {
 
@@ -201,60 +200,4 @@ export class ხე {
       )
     )
   }
-}
-
-function hash (value) {
-  var shasum = crypto.createHash('sha1')
-  shasum.update(value.toString())
-  return shasum.digest('hex')
-}
-
-function deserializefn (value) {
-  if (value && typeof value === 'string' && value.substr(0, 8) === 'function') {
-    var startBody = value.indexOf('{') + 1
-    var endBody = value.lastIndexOf('}')
-    var startArgs = value.indexOf('(') + 1
-    var endArgs = value.indexOf(')')
-    return new Function(value.substring(startArgs, endArgs), value.substring(startBody, endBody)) // eslint-disable-line
-  }
-}
-
-function purify_0 (fn) {
-  var fnStr = fn.toString()
-  var pureFn = deserializefn(fnStr)
-  pureFn.id = hash(fnStr)
-  return fn.length === 0 ? pureFn() : pureFn
-}
-
-var excelConverter = {
-  import: b => require('./xlsx-importer')(b),
-  export: ws => require('./xlsx-exporter')(ws)
-}
-var converters = {
-  'xlsx': excelConverter,
-  'xls': excelConverter,
-  'json': {
-    import: x => JSON.parse(x.toString()),
-    export: x => new Buffer(JSON.stringify(x))
-  },
-  'default': {
-    import: x => x,
-    export: x => x
-  }
-}
-
-function getConverter (path) {
-  var key = Object.keys(converters)
-    .filter(ext => path.lastIndexOf('.' + ext) === path.length - ext.length - 1)[0] || 'default'
-  return converters[key]
-}
-
-function purify (fn) {
-  fn = purify_0(fn)
-  var fn2 = function (...args) {
-    args = args.map(a => a instanceof Buffer ? getConverter(args[args.length - 1]).import(a) : a)
-    return fn.apply({ emit: (path, value) => this.emit(path, getConverter(path).export(value)) }, args)
-  }
-  fn2.id = fn.id
-  return fn2
 }

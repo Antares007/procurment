@@ -1,7 +1,6 @@
 var XLSX = require('XLSX')
 
 module.exports = function (data) {
-  console.log(data)
   var wb = data.reduce(function (wb, sheet) {
     wb.SheetNames.push(sheet.name)
     wb.Sheets[sheet.name] = sheet_from_array_of_arrays(sheet.rows)
@@ -41,3 +40,4 @@ function sheet_from_array_of_arrays (data, opts) {
   if (range.s.c < 10000000) ws['!ref'] = XLSX.utils.encode_range(range)
   return ws
 }
+
