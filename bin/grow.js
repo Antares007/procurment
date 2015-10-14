@@ -17,7 +17,7 @@ process.stdin.pipe(transform(function (chunk, encoding, next) {
     if (error) {
       ds.emit('error', error)
     } else {
-      require('../index.js')(
+      require('../lib/index.js')(
         sha,
         gitDir + '/.git',
         require(process.cwd() + '/' + argv._[0]),

@@ -1,2 +1,0 @@
-var { GitObject } = require('./gitobject')
-
