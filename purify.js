@@ -30,17 +30,15 @@ var excelConverter = {
   import: b => require('./xlsx-importer')(b),
   export: ws => require('./xlsx-exporter')(ws)
 }
+var jsonConverter = {
+  import: x => JSON.parse(x.toString()),
+  export: x => new Buffer(JSON.stringify(x))
+}
 var converters = {
   'xlsx': excelConverter,
   'xls': excelConverter,
-  'json': {
-    import: x => JSON.parse(x.toString()),
-    export: x => new Buffer(JSON.stringify(x))
-  },
-  'default': {
-    import: x => x,
-    export: x => x
-  }
+  'json': jsonConverter,
+  'default': jsonConverter
 }
 
 function getConverter (path) {

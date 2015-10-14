@@ -9,6 +9,15 @@ export class ხე {
     this.commit = commit
   }
 
+  exec (path) {
+    return this.grow(
+      function (oldRoot, newRoot, oldTree) {
+        return newRoot.get(path, new Tree())
+      },
+      `select(${path})`
+    )
+  }
+
   select (path) {
     return this.grow(
       function (oldRoot, newRoot, oldTree) {

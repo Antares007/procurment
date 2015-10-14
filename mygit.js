@@ -37,6 +37,7 @@ module.exports = function gitStreamer(gitDir) {
     parseDiffLine: function(x){
       var [rest, path] = x.split('\t');
       var [oldMode, newMode, oldSha, newSha, status] = rest.split(' ');
+      oldMode = oldMode.slice(1)
       if(newSha * 1 === 0) return { path, status, oldSha, oldMode };
       if(oldSha * 1 === 0) return { path, status, newSha, newMode };
       return { path, status, newSha, oldSha, newMode, oldMode };
@@ -60,6 +61,16 @@ module.exports = function gitStreamer(gitDir) {
       return {
         readTree: function(sha, cb){
           git('read-tree ' + sha, [], options, cb);
+        },
+        merge3: function(sha1, sha2, sha3, cb) {
+          git(`read-tree -m -i ${sha1} ${sha2} ${sha3}`, [], options, cb)
+        },
+        ls: function(cb) {
+          git(`ls-files -s -u`, [s => s.split('\n').slice(0, -1).map(x => {
+            var [rest, path] = x.split('\t')
+            var [mode, sha, stage] = rest.split(' ')
+            return { mode, sha, stage, path }
+          })], options, cb)
         },
         writeTree: function(cb) {
           git('write-tree', [mappers.trimOutput], options, cb);
@@ -91,20 +102,36 @@ module.exports = function gitStreamer(gitDir) {
           n();
         });
     },
-    lsTree: function(sha, cb) {
-      git(
-        'ls-tree ' + sha,
-        [x => x.split('\n').filter(l => l).map((line) => {
-          var [rest, name] = line.split('\t');
-          var [mode, type, sha] = rest.split(' ');
-          return {mode, type, sha, name};
-        })],
-        cb
-      );
+    lsTree: function(sha, rec, cb) {
+      if (typeof rec === 'function') {
+        cb = rec
+        rec = false
+      }
+      if (rec) {
+        git(
+          'ls-tree -r ' + sha,
+          [x => x.split('\n').filter(l => l).map((line) => {
+            var [rest, path] = line.split('\t');
+            var [mode, type, sha] = rest.split(' ');
+            return {mode, type, sha, path};
+          })],
+          cb
+        )
+      } else {
+        git(
+          'ls-tree ' + sha,
+          [x => x.split('\n').filter(l => l).map((line) => {
+            var [rest, name] = line.split('\t');
+            var [mode, type, sha] = rest.split(' ');
+            return {mode, type, sha, name};
+          })],
+          cb
+        )
+      }
     },
     mktree: function(entries, cb) {
       var data = entries.map(e => `${e.mode} ${e.type} ${e.sha}\t${e.name}`).join('\n');
-      git('mktree --missing', [mappers.trimOutput], cb).stdin.end(data, 'utf8');
+      git('mktree ', [mappers.trimOutput], cb).stdin.end(data, 'utf8');
     },
     commitTree: function(treeSha, parentShas, message, cb) {
       var parents = parentShas.length > 0 ? '-p ' + parentShas.join(' -p ') : '';
@@ -141,7 +168,7 @@ module.exports = function gitStreamer(gitDir) {
       git(
         'cat-file -p ' + sha,
         [mappers.trimOutput, x => new Buffer(x, 'binary')],
-        { encoding: 'binary', timeout: 0, maxBuffer: 1000*1024, killSignal: 'SIGTERM' },
+        { encoding: 'binary', timeout: 0, maxBuffer: 1000 * 1024, killSignal: 'SIGTERM' },
         cb
       );
     },
@@ -160,8 +187,14 @@ module.exports = function gitStreamer(gitDir) {
       zlib.deflate(Buffer.concat([header, buffer]), function(err, buffer){
         if(err) return cb(err);
         mkdirp(fileDir, function(){
-          fs.writeFile(filePath, buffer, function(err){
-            if(err) return cb(err);
+          fs.writeFile(filePath, buffer, { flag: 'wx' }, function(err){
+            if (err) {
+              if (err.code === 'EEXIST') {
+                cb(null, sha)
+              } else {
+                return cb(err);
+              }
+            }
             cb(null, sha);
           });
         });
@@ -282,7 +315,8 @@ function denodeifyApi(mygit){
     'commitTree',
     'getCommit',
     'mktree',
-    'hashObject'
+    'hashObject',
+    'getBlob'
   ].reduce((s, x) => (s[x] = denodeify(mygit[x]), s), {});
 
   git.catFileBatch = function(){
@@ -300,6 +334,8 @@ function denodeifyApi(mygit){
     return {
       readTree: denodeify(index.readTree),
       writeTree: denodeify(index.writeTree),
+      merge3: denodeify(index.merge3),
+      ls: denodeify(index.ls),
       createUpdateIndexInfoStream: index.createUpdateIndexInfoStream
     }
   };
@@ -317,6 +353,40 @@ function denodeifyApi(mygit){
       return `${mode} ${sha}\t${path}\n`
     }
   };
+
+  git.merge3 = async function(sha1, sha2, sha3, fn) {
+    var indexFileName = '/tmp/git-index-' + process.pid + '.' + (indexInfoId++) + '.tmp'
+    var index = git.openIndex(indexFileName)
+    await index.readTree(emptyTreeSha)
+    await index.merge3(sha1, sha2, sha3)
+    var entriestomerge = (await index.ls())
+      .reduce((s, x) => (
+        s[x.path] = (s[x.path] || {}),
+        s[x.path][x.stage.toString()] = x,
+        s
+      ), {})
+    var updates = await Promise.all(Object.keys(entriestomerge).map(async function (path) {
+      var stages = entriestomerge[path]
+      var rez = await fn(stages['1'], stages['2'], stages['3'])
+      rez.path = path
+      return rez
+    }))
+    updates = updates
+      .map(x => ({status: 'D', path: x.path}))
+      .concat(updates.filter(x => x.status !== 'D'))
+      .map(toIndexInfoLine).join('')
+    var indexInfo = index.createUpdateIndexInfoStream()
+    await new Promise((resolve, reject) => {
+      indexInfo
+        .once('error', err => reject(err))
+        .once('child.exit', () => resolve())
+        .write(updates)
+      indexInfo.end()
+    })
+    var sha = await index.writeTree()
+    require('fs').unlink(indexFileName)
+    return sha
+  }
 
   git.mkDeepTree = async function(baseTree, patchStream){
     var indexFileName = '/tmp/git-index-' + process.pid + '.' + (indexInfoId++) + '.tmp';
