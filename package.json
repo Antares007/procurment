@@ -4,7 +4,9 @@
   "description": "",
   "main": "./lib/index.js",
   "bin": {
-    "grow": "./bin/grow.js"
+    "grow": "./bin/grow.js",
+    "growold": "./bin/growold.js",
+    "plant": "./bin/plant.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
