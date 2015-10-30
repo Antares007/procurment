@@ -183,7 +183,7 @@ export class Tree extends GitObject {
         .map(e => Object.assign(e.type === 'blob' ? new Blob(e.sha) : new Tree(e.sha), e))
       var tree = {}
       var rez = fn.call(tree, entries)
-      return rez instanceof Tree ? rez : await Tree.of(tree).getSha(git)
+      return await (rez instanceof Tree ? rez : Tree.of(tree)).getSha(git)
     })
   }
 
@@ -203,16 +203,17 @@ export class Tree extends GitObject {
         }
       })
 
+      var entries = await Promise.all(
+        Object.keys(tree).map(async function(name) {
+          var e = tree[name]
+          var type = e instanceof Tree ? 'tree' : 'blob'
+          var mode = e instanceof Tree ? '040000' : '100644'
+          var sha = await e.getSha(git)
+          return { mode, type, sha, name }
+        })
+      )
       return await git.mktree(
-        await Promise.all(
-          Object.keys(tree).map(async function(name) {
-            var e = tree[name]
-            var type = e instanceof Tree ? 'tree' : 'blob'
-            var mode = e instanceof Tree ? '040000' : '100644'
-            var sha = await e.getSha(git)
-            return { mode, type, sha, name }
-          })
-        )
+        entries.filter(x => x.type !== 'tree' || x.sha !== emptyTreeSha)
       )
     })
   }

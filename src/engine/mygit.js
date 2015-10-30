@@ -4,6 +4,7 @@ var transform = require('./transform.js')
 var assert = require('assert')
 var {AStream} = require('./astream.js')
 var debug = require('debug')('mygit')
+var denodeify = require('./denodeify.js')
 
 module.exports = function gitStreamer (gitDir) {
   var gitCmdBase = gitDir ? `git --git-dir=${gitDir} ` : 'git '
@@ -278,9 +279,9 @@ module.exports = function gitStreamer (gitDir) {
   return denodeifyApi(api)
 }
 
-module.exports.getGitDir = function getGitDir (cb) {
+module.exports.getGitDir = denodeify(function getGitDir (cb) {
   exec('git rev-parse --show-toplevel', (err, std) => cb(err, std ? std.trim() + '/.git' : std))
-}
+})
 
 function exec (str, opt, cb) {
   if (typeof opt === 'function') {
@@ -304,7 +305,6 @@ function exec (str, opt, cb) {
 }
 
 function denodeifyApi (mygit) {
-  var denodeify = require('./denodeify.js')
   var git = [
     'exec',
     'revParse',

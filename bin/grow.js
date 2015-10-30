@@ -3,8 +3,8 @@
 require('babel/register')({ extensions: ['.es6', '.es', '.jsx', '.js'] })
 
 var argv = require('yargs').argv
-var mygit = require('../lib/engine/mygit')
-var Commit = require('../lib/commit').Commit
+var mygit = require('../src/engine/mygit')
+var Commit = require('../src/commit').Commit
 
 mygit.getGitDir(function (err, dir) {
   if (err) throw err

@@ -1,9 +1,6 @@
 import { GitObject } from './gitobject'
 import { Tree } from './tree'
 import { Blob } from './blob'
-import debug from 'debug'
-
-var log = debug('commit')
 
 export class Commit extends GitObject {
   constructor (gitContext) {
@@ -83,10 +80,14 @@ export class Commit extends GitObject {
         var prevCommit = oldTreeCommit
         var maybeSeedCommitSha = await git.exec('rev-list --first-parent --max-parents=0 ' + thisCommit.sha, [x => x.trim()])
         var script = (await git.cat(await git.revParse(maybeSeedCommitSha + ':seed.js'))).toString()
-        var commit = (tree, message) =>
-          prevCommit = Commit.create(tree, [prevCommit, newRootCommit], require('crypto').createHash('sha1').update(script).digest('hex'))
-        var seed = makeSeed(script, commit)
-        return await seed.fn2(oldRootCommit, newRootCommit, oldTreeCommit).getSha(git)
+        var seed = makeSeed(script)
+        return await (
+          seed(oldRootCommit.getTree(), newRootCommit.getTree(), oldTreeCommit.getTree())
+            .commit(
+              [prevCommit, newRootCommit],
+              require('crypto').createHash('sha1').update(script).digest('hex')
+            )
+        ).getSha(git)
       }
     })
   }
@@ -94,10 +95,12 @@ export class Commit extends GitObject {
   plant (script) {
     var seedCommit = Commit.create(Tree.of({ 'seed.js': new Buffer(script) }), [], 'seed')
     var prevCommit = seedCommit
-    var commit = (tree, message) =>
-      prevCommit = Commit.create(tree, [prevCommit, this], require('crypto').createHash('sha1').update(script).digest('hex'))
-    var seed = makeSeed(script, commit)
-    return seed.fn1(this)
+    var seed = makeSeed(script)
+    return seed(new Tree(), this.getTree(), new Tree())
+      .commit(
+        [prevCommit, this],
+        require('crypto').createHash('sha1').update(script).digest('hex')
+      )
   }
 
   branch (script) {
@@ -121,10 +124,11 @@ export class Commit extends GitObject {
 
 function makeSeed (script, commit) {
   var vm = require('vm')
-  var sandbox = { console, commit, seed: {} }
+  var sandbox = { console, commit, seed: {}, Tree }
   vm.runInNewContext(script, sandbox)
   return sandbox.seed
 }
+
 Tree.prototype.commit = function (parents, message) {
   return Commit.create(this, parents, message)
 }

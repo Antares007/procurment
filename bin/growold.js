@@ -13,36 +13,23 @@ process.stdin.pipe(transform(function (chunk, encoding, next) {
   next()
 })).pipe(transform(function (sha, encoding, next) {
   var ds = this
-  findGitDir(function (error, gitDir) {
-    if (error) {
-      ds.emit('error', error)
-    } else {
-      require('../lib/index.js')(
-        sha,
-        gitDir + '/.git',
-        require(process.cwd() + '/' + argv._[0]),
-        function (err, sha) {
-          if (err) throw err
-          ds.push(sha + '\n')
-          next()
-        }
-      )
-    }
-  })
+  var engine = require('../src/engine')
+  engine.start()
+    .then(git => {
+      var Commit = require('../src/commit').Commit
+      var module = require(process.cwd() + '/' + argv._[0])
+      var rezCommit = module(new Commit(sha))
+      return rezCommit.getSha(git).then(function (sha) {
+        git.stop()
+        ds.push(sha)
+      })
+    })
+    .catch(err => process.nextTick(function () {
+      ds.emit('error', err)
+    }))
 })).pipe(process.stdout)
 
 function transform (fn) {
   var stream = require('stream')
   return new stream.Transform({ objectMode: true, transform: fn })
-}
-function findGitDir (cb) {
-  require('child_process').exec('git rev-parse --show-toplevel', function (error, stdout, stderr) {
-    if (error) {
-      return cb(error)
-    } else if (stderr) {
-      return cb(new Error(stderr))
-    } else {
-      cb(null, stdout.trim())
-    }
-  })
 }
