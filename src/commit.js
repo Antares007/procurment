@@ -79,33 +79,23 @@ export class Commit extends GitObject {
         var oldTreeCommit = new Commit(thisCommit.sha)
         var prevCommit = oldTreeCommit
         var maybeSeedCommitSha = await git.exec('rev-list --first-parent --max-parents=0 ' + thisCommit.sha, [x => x.trim()])
-        var script = (await git.cat(await git.revParse(maybeSeedCommitSha + ':seed.js'))).toString()
+        var seedSignature = await git.revParse(maybeSeedCommitSha + ':seed.js')
+        var script = (await git.cat(seedSignature)).toString()
         var seed = makeSeed(script)
         return await (
           seed(oldRootCommit.getTree(), newRootCommit.getTree(), oldTreeCommit.getTree())
             .commit(
               [prevCommit, newRootCommit],
-              require('crypto').createHash('sha1').update(script).digest('hex')
+              seedSignature
             )
         ).getSha(git)
       }
     })
   }
 
-  plant (script) {
-    var seedCommit = Commit.create(Tree.of({ 'seed.js': new Buffer(script) }), [], 'seed')
-    var prevCommit = seedCommit
-    var seed = makeSeed(script)
-    return seed(new Tree(), this.getTree(), new Tree())
-      .commit(
-        [prevCommit, this],
-        require('crypto').createHash('sha1').update(script).digest('hex')
-      )
-  }
-
   branch (script) {
     return new Commit(async git => {
-      var seedSignature = require('crypto').createHash('sha1').update(script).digest('hex')
+      var seedSignature = await script.getSha(git)
       var seedCommits = await git.exec(
         'rev-list --all --reflog --parents --min-parents=2 --grep=' + seedSignature,
         [x => x.split('\n').slice(0, -1).map(x => x.split(' ')).map(x => ({ sha: x[0], parents: x.slice(1) }))]
@@ -116,7 +106,11 @@ export class Commit extends GitObject {
       if (oldTreeCommit) {
         return await new Commit(oldTreeCommit.sha).grow(this).getSha(git)
       } else {
-        return await this.plant(script).getSha(git)
+        var seedCommit = Commit.create(Tree.of({ 'seed.js': script }), [], 'seed')
+        var seed = makeSeed((await git.cat(seedSignature)).toString())
+        return await seed(new Tree(), this.getTree(), new Tree())
+          .commit([seedCommit, this], seedSignature)
+          .getSha(git)
       }
     })
   }
