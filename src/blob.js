@@ -12,40 +12,29 @@ export class Blob extends GitObject {
       return await git.hashObject(
         value instanceof Buffer
           ? value
-          : new Buffer(JSON.stringify(value))
+          : new Buffer(JSON.stringify(value, null, '  '))
       )
     })
   }
 
-  update (fn) {
+  bind (fn) {
+    if (typeof fn !== 'function') throw new Error('fn should be function')
     return new Blob(
-      async (git) => await git.hashObject(
-        ensureBuffer(
-          convertArgs(fn)(await git.cat(await this.getSha(git)))
-        )
-      )
+      async (git) => {
+        var buffer = await git.cat(await this.getSha(git))
+        var rez = convertArgs(fn)(buffer)
+        return await (rez instanceof Blob ? rez : Blob.of(rez)).getSha(git)
+      }
     )
   }
 
-  merge (other, merger) {
-    return new Blob(async (git) => {
-      return await git.hashObject(
-        ensureBuffer(
-          convertArgs(merger)(
-            await git.cat(await this.getSha(git)),
-            await git.cat(await other.getSha(git))
-          )
-        )
-      )
-    })
-  }
-
   toTree (fn) {
+    if (typeof fn !== 'function') throw new Error('fn should be function')
     return new Tree(async (git) => {
       var entries = []
       var buffer = await git.cat(await this.getSha(git))
 
-      convertArgs(fn).call({
+      var rez = convertArgs(fn).call({
         emit: function (path, buffer) {
           entries.push({ path, buffer: ensureBuffer(buffer) })
         },
@@ -53,6 +42,7 @@ export class Blob extends GitObject {
           entries.push({ path, sha })
         }
       }, buffer)
+      if (rez) return await (rez instanceof Tree ? rez : Tree.of(rez)).getSha(git)
 
       var treeEntries = await Promise.all(
         entries.map(async e => ({

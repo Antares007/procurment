@@ -1,5 +1,6 @@
 import { GitObject } from './gitobject'
 import { Blob } from './blob'
+import { AStream } from './engine/astream'
 import debuger from 'debug' // eslint-disable-line
 let debug = debuger('tree')
 
@@ -14,23 +15,6 @@ export class Tree extends GitObject {
 
   clear () {
     return new Tree()
-  }
-
-  get (path, nullValue = new Tree()) {
-    var Type = nullValue instanceof Tree ? Tree : Blob
-    return new Type(async (git) => {
-      var sha = await this.getSha(git)
-      try {
-        var target = await git.revParse(sha + ':' + path)
-        return target
-      } catch (ex) {
-        if (ex.message.indexOf('does not exist in') >= 0 ||
-           ex.message.indexOf('exists on disk, but not in') >= 0) {
-          return await nullValue.getSha(git)
-        }
-        throw ex
-      }
-    })
   }
 
   rm (other) {
@@ -114,23 +98,37 @@ export class Tree extends GitObject {
     })
   }
 
-  reduce (fn, initState) {
-    if (initState instanceof GitObject) {
-      return new initState.constructor(async (git) => {
-        var entries = await git.lsTree(await this.getSha(git), true)
-        var newState = entries.reduce((state, e) => fn(state, Object.assign(new Blob(e.sha), e), e.path), initState)
-        return await newState.getSha(git)
+  reindex (fn) {
+    var crypto = require('crypto')
+    var hash = (str) => crypto.createHash('sha1').update(str).digest('hex')
+    return new Tree(async (git) => {
+      var ls = await git.lsTree(await this.getSha(git), true)
+      var entries = ls.map(function (e) {
+        var uniqKey = hash(e.path)
+        var newPath = fn(e.path, uniqKey)
+        if (newPath) {
+          if (newPath.indexOf(uniqKey) === -1 && newPath.indexOf(e.path) === -1) {
+            throw new Error('when reindexing new path should contain old path or hash(path)')
+          }
+          e.path = newPath
+          return e
+        }
+      }).filter(function (e) {
+        return e
       })
-    } else {
-      return new Blob(async (git) => {
-        var entries = await git.lsTree(await this.getSha(git), true)
-        var newState = entries.reduce((state, e) => fn(state, Object.assign(new Blob(e.sha), e), e.path), initState)
-        return await Blob.of(newState).getSha(git)
-      })
-    }
+      return await git.mkDeepTree(emptyTreeSha, entries)
+    })
   }
 
-  map (fn) {
+  reduce (fn, initTree) {
+    return new Tree(async (git) => {
+      var ls = await git.lsTree(await this.getSha(git), true)
+      var newTree = ls.reduce((state, e) => fn(state, new Blob(e.sha), e.path), initTree)
+      return await Tree.of(newTree).getSha(git)
+    })
+  }
+
+  mapBlobs (fn) {
     return new Tree(async (git) => {
       var patchStream = git.diffTree(emptyTreeSha, await this.getSha(git))
         .transform(async function (patch) {
@@ -177,56 +175,90 @@ export class Tree extends GitObject {
     })
   }
 
-  cd (fn) {
-    return new Tree(async (git) => {
-      var entries = (await git.lsTree(await this.getSha(git)))
-        .map(e => Object.assign(e.type === 'blob' ? new Blob(e.sha) : new Tree(e.sha), e))
-      var tree = {}
-      var rez = fn.call(tree, entries)
-      return await (rez instanceof Tree ? rez : Tree.of(tree)).getSha(git)
-    })
+  bind (fn) {
+    return bind.call(this, Tree, fn)
+  }
+
+  toBlob (fn) {
+    return bind.call(this, Blob, fn)
+  }
+
+  get (path, nullValue) {
+    return get.call(this, Tree, path, nullValue)
+  }
+
+  getBlob (path, nullValue) {
+    return get.call(this, Blob, path, nullValue)
   }
 
   static of (tree) {
     if (Object.keys.length === 0) {
       return new Tree(() => emptyTreeSha)
     }
-    return new Tree(async (git) => {
-      Object.keys(tree).forEach(function (key) {
-        if (tree[key] instanceof Tree || tree[key] instanceof Blob) {
-          return
-        }
-        if (Object.getPrototypeOf(tree[key]) === Object.prototype) {
-          tree[key] = Tree.of(tree[key])
+    function traverseObj (obj, path, fn) {
+      Object.keys(obj).forEach(function (key) {
+        if (obj[key] && obj[key].constructor && obj[key].constructor.name === 'Object') {
+          traverseObj(obj[key], path.concat(key), fn)
         } else {
-          tree[key] = Blob.of(tree[key])
+          fn(path.concat(key), obj[key])
         }
       })
-
-      var entries = await Promise.all(
-        Object.keys(tree).map(async function(name) {
-          var e = tree[name]
-          var type = e instanceof Tree ? 'tree' : 'blob'
-          var mode = e instanceof Tree ? '040000' : '100644'
-          var sha = await e.getSha(git)
-          return { mode, type, sha, name }
+    }
+    return new Tree(async (git) => {
+      var entries = []
+      traverseObj(tree, [], function (paths, value) {
+        entries.push({
+          path: paths.join('/'),
+          gitObject: value instanceof GitObject ? value : Blob.of(value)
         })
-      )
-      return await git.mktree(
-        entries.filter(x => x.type !== 'tree' || x.sha !== emptyTreeSha)
-      )
-    })
-  }
-
-  toBlob (fn, nullValue) {
-    return new Blob(async (git) => {
-      var sha = await this.getSha(git)
-      if (sha === Tree.emptySha) return await Blob.of(nullValue).getSha(git)
-      var entries = (await git.lsTree(sha))
-        .map(e => Object.assign(e.type === 'blob' ? new Blob(e.sha) : new Tree(e.sha), e))
-      var rez = fn(entries)
-      return await (rez instanceof Blob ? rez : Blob.of(rez)).getSha(git)
+      })
+      if (entries.length === 0) return emptyTreeSha
+      var patchStream = AStream.fromArray(entries)
+        .transform(async function (x) {
+          var sha = await x.gitObject.getSha(git)
+          if (x.gitObject instanceof Tree) {
+            for (var entry of await git.lsTree(sha, true)) {
+              this.push({ newMode: '100644', status: 'A', path: x.path + '/' + entry.path, newSha: entry.sha })
+            }
+          } else {
+            this.push({ newMode: '100644', status: 'A', path: x.path, newSha: sha })
+          }
+        })
+      return await git.mkDeepTree(emptyTreeSha, patchStream)
     })
   }
 }
 Tree.emptySha = emptyTreeSha
+
+function bind (Constructor, fn) {
+  return new Constructor(async (git) => {
+    var ls = await git.lsTree(await this.getSha(git))
+    var entries = ls.map(
+      e => Object.assign(
+        e.type === 'blob' ? new Blob(e.sha) : new Tree(e.sha),
+        e
+      )
+    ).reduce((s, e) => (s[e.name] = e, s), {})
+    var rez = fn(entries)
+    return await (rez instanceof Constructor ? rez : Constructor.of(rez)).getSha(git)
+  })
+}
+
+function get (Constructor, path, nullValue) {
+  return new Constructor(async (git) => {
+    var sha = await this.getSha(git)
+    try {
+      var target = await git.revParse(sha + ':' + path)
+      return target
+    } catch (ex) {
+      if (typeof nullValue !== 'undefined' && ex.code === 128) {
+        return await (
+          nullValue instanceof Constructor
+            ? nullValue
+            : Constructor.of(nullValue)
+        ).getSha(git)
+      }
+      throw ex
+    }
+  })
+}

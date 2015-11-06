@@ -1,9 +1,22 @@
 import transform from './transform.js'
+import { Readable } from 'stream'
 
 export class AStream {
 
   constructor (readableStreamFactory) {
     this.readableStreamFactory = readableStreamFactory
+  }
+
+  static fromArray (arr) {
+    return new AStream(function () {
+      var clone = arr.slice()
+      return new Readable({
+        objectMode: true,
+        read: function () {
+          this.push(clone.length === 0 ? null : clone.pop())
+        }
+      })
+    })
   }
 
   valueOf () {
