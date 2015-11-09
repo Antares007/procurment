@@ -23,7 +23,10 @@ export class Commit extends GitObject {
   static of (def) {
     return new Commit(async git => {
       var commit = Object.assign({ parents: [] }, def, {
-        tree: await def.tree.getSha(git)
+        tree: await def.tree.getSha(git),
+        parents: def.parents
+          ? await Promise.all(def.parents.map(x => x.getSha(git)))
+          : def.parents
       })
       var hash = await git.saveAs('commit', commit)
       return hash
