@@ -4,7 +4,7 @@ export class GitObject {
   constructor (shaFn) {
     if (typeof shaFn === 'string') {
       if (shaRegex.test(shaFn)) {
-        this.shaFn = (git) => shaFn
+        this.shaFn = (git) => Promise.resolve(shaFn)
       } else {
         this.shaFn = (git) => git.revParse(shaFn)
       }
@@ -28,4 +28,20 @@ export class GitObject {
     }
     return this
   }
+
+  bind (Constructor, fn) {
+    ensure(() => typeof fn === 'function')
+    return new Constructor(
+      async (git) => {
+        var value = await this.valueOf(git)
+        var rez = fn(value)
+        ensure(() => rez instanceof GitObject)
+        return await rez.getSha(git)
+      }
+    )
+  }
+}
+
+function ensure (assertFn) {
+  if (!assertFn()) throw new Error(assertFn.toString())
 }

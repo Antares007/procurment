@@ -3,5 +3,5 @@
   "blacklist": ["es6.classes", "es6.constants"],
   "loose": ["es6.modules"],
   "optional": ["asyncToGenerator"],
-  "ignore": []
+  "ignore": ["node_modules"]
 }

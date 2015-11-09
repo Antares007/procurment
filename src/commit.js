@@ -8,6 +8,28 @@ export class Commit extends GitObject {
     this.isCommit = true
   }
 
+  valueOf (git) {
+    return this.getSha(git).then(hash => git.loadAs('commit', hash))
+      .then(function (value) {
+        return Object.assign({}, value, {
+          tree: new Tree(value.tree),
+          parents: value.parents
+            ? value.parents.map(hash => new Commit(hash))
+            : value.parents
+        })
+      })
+  }
+
+  static of (def) {
+    return new Commit(async git => {
+      var commit = Object.assign({ parents: [] }, def, {
+        tree: await def.tree.getSha(git)
+      })
+      var hash = await git.saveAs('commit', commit)
+      return hash
+    })
+  }
+
   getParent (index = 0) {
     return new Commit(async git => await git.revParse(`${ await this.getSha(git) }^${ index + 1 }`))
   }
@@ -118,11 +140,15 @@ export class Commit extends GitObject {
 
 function makeSeed (script, commit) {
   var vm = require('vm')
-  var sandbox = { console, commit, seed: {}, Tree }
+  var sandbox = { console, commit, seed: {}, Tree, Blob }
   vm.runInNewContext(script, sandbox)
   return sandbox.seed
 }
 
 Tree.prototype.commit = function (parents, message) {
   return Commit.create(this, parents, message)
+}
+
+function ensure (assertFn) {
+  if (!assertFn()) throw new Error(assertFn.toString())
 }

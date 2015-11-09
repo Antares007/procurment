@@ -1,17 +1,20 @@
 export default function denodeify (fn) {
-  return function (...args) {
+  return function () {
+    var args = Array.prototype.slice.call(arguments)
     return new Promise(function (resolve, reject) {
-      fn(...args, function (err, ...values) {
-        if (err) {
-          reject(err)
-        } else {
-          if (values.length > 1) {
-            resolve(values)
+      fn.apply(
+        {},
+        args.concat(function () {
+          var args = Array.prototype.slice.call(arguments)
+          var err = args[0]
+          var values = args.slice(1)
+          if (err) {
+            reject(err)
           } else {
-            resolve(...values)
+            resolve.apply({}, values)
           }
-        }
-      })
+        })
+      )
     })
   }
 }
