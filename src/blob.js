@@ -1,9 +1,8 @@
-import { GitObject } from './gitobject'
+var GitObject = require('./gitobject').GitObject
 
-export class Blob extends GitObject {
+class Blob extends GitObject {
   constructor (gitContext) {
     super(gitContext)
-    this.isBlob = true
   }
 
   valueOf (git) {
@@ -16,4 +15,19 @@ export class Blob extends GitObject {
       return blobHash
     })
   }
+
+  merge (blobs, fn) {
+    var values = []
+    return this.bind(Blob, function merge (value) {
+      values.push(value)
+      var other = blobs.shift()
+      if (typeof other !== 'undefined') {
+        return other.bind(Blob, merge)
+      } else {
+        return Blob.of(fn(values))
+      }
+    })
+  }
 }
+
+module.exports = { Blob }

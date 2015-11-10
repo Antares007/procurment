@@ -1,13 +1,12 @@
-import { GitObject } from './gitobject'
-import { Blob } from './blob'
-import debuger from 'debug' // eslint-disable-line
+var GitObject = require('./gitobject').GitObject
+var Blob = require('./blob').Blob
+
 var modes = require('js-git/lib/modes')
-let debug = debuger('tree')
 
 const emptyTreeSha = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 const nullSha = 'ec747fa47ddb81e9bf2d282011ed32aa4c59f932'
 
-export class Tree extends GitObject {
+class Tree extends GitObject {
   constructor (gitContext) {
     super(typeof gitContext === 'undefined' ? () => emptyTreeSha : gitContext)
   }
@@ -65,7 +64,38 @@ export class Tree extends GitObject {
     })
   }
 
-  diff (other) {
+  merge (newTree) {
+    return this.bind(Tree, function (ot) {
+      return newTree.bind(Tree, function (nt) {
+        var patchs = Object.keys(ot)
+          .reduce(function (s, key) {
+            var deleted = ot[key]
+            var added = nt[key]
+            if (added) {
+
+            } else {
+              // s[key] = { deleted: }
+            }
+            var patch = { old: t1[key], new: t2[key] }
+            if (patch.new) {
+              if (patch.old.hash !== patch.new.hash) {
+                patch.state = 'M'
+                s[key] = patch
+              }
+              delete t2[key]
+            } else {
+            }
+            return s
+          }, {})
+        patchs = Object.keys(t2)
+          .reduce(function (s, key) {
+            s[key] = { state: 'A', new: t2[key] }
+            return s
+          }, patchs)
+
+        return Tree.of(diff)
+      })
+    })
     return new Tree(async (git) => {
       var patchStream = git.diffTree(await this.getSha(git), await other.getSha(git))
         .transform(function (patch, next) {
@@ -250,3 +280,5 @@ Tree.emptySha = emptyTreeSha
 function ensure (assertFn) {
   if (!assertFn()) throw new Error(assertFn.toString())
 }
+
+module.exports = { Tree }

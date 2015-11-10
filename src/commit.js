@@ -1,8 +1,8 @@
-import { GitObject } from './gitobject'
-import { Tree } from './tree'
-import { Blob } from './blob'
+var GitObject = require('./gitobject').GitObject
+var Tree = require('./tree').Tree
+var Blob = require('./blob').Blob
 
-export class Commit extends GitObject {
+class Commit extends GitObject {
   constructor (gitContext) {
     super(gitContext)
     this.isCommit = true
@@ -155,3 +155,5 @@ Tree.prototype.commit = function (parents, message) {
 function ensure (assertFn) {
   if (!assertFn()) throw new Error(assertFn.toString())
 }
+
+module.exports = { Commit }
