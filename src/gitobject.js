@@ -1,50 +1,40 @@
-const shaRegex = /^[0123456789abcdef]{40}$/
+'use strict'
+const isHash = /^[0123456789abcdef]{40}$/
+var run = require('gen-run')
 
 class GitObject {
-  constructor (shaFn) {
-    if (typeof shaFn === 'string') {
-      if (shaRegex.test(shaFn)) {
-        this.shaFn = (git) => Promise.resolve(shaFn)
-      } else {
-        this.shaFn = (git) => git.revParse(shaFn)
-      }
+  constructor (hash) {
+    if (typeof hash === 'function') {
+      this.hashFn = hash
+    } else if (typeof hash === 'string' && isHash.test(hash)) {
+      this.hash = hash
     } else {
-      this.shaFn = shaFn
+      throw new Error('hashFn != function or not hash string ' + hash)
     }
   }
 
-  getSha (git) {
-    if (this.promisedSha) return this.promisedSha
-    this.promisedSha = this.shaFn(git)
-    return this.promisedSha
+  getHash (git, cb) {
+    if (!cb) return this.getHash.bind(this, git)
+    if (this.hash || this.err) return cb(this.err, this.hash)
+    var fn = this.hashFn
+    delete this.hashFn
+    fn(git, (err, hash) => {
+      if (err) {
+        this.err = err
+      }
+      this.hash = hash
+      cb(err, hash)
+    })
   }
 
   bind (Type, fn) {
-    ensure(() => typeof fn === 'function')
-    return new Type(
-      async (git) => {
-        var value = await this.valueOf(git)
-        var rez = fn(value)
-        ensure(() => rez instanceof GitObject)
-        return await rez.getSha(git)
-      }
-    )
+    var self = this
+    return new Type((git, cb) => run(function * () {
+      var value = yield self.valueOf(git)
+      var rez = fn(value)
+      return yield rez.getHash(git)
+    }, cb))
   }
-
-  do (fn) {
-    if (this.promisedSha) return this.promisedSha.then(x => (fn(x), x))
-    var oldShafn = this.shaFn
-    this.shaFn = async function (git) {
-      var sha = await oldShafn(git)
-      fn(sha)
-      return sha
-    }
-    return this
-  }
-}
-
-function ensure (assertFn) {
-  if (!assertFn()) throw new Error(assertFn.toString())
 }
 
 module.exports.GitObject = GitObject

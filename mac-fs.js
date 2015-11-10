@@ -7,13 +7,15 @@ module.exports = {
   // - readFile(path) => binary
   //   Must also call callback() with no arguments if the file does not exist.
   readFile: (path, cb) => fs.readFile(path, function (err, buffer) {
-    if (err) return cb(err)
+    if (err) {
+      if (err.code === 'ENOENT') return cb()
+      cb(err)
+    }
     cb(null, buffer)
   }),
   // - readChunk(path, start, end) => binary
   //   Must also call callback() with no arguments if the file does not exist.
   readChunk: (path, start, end, cb) => fs.open(path, 'r', function (err, fd) {
-    if (err) return cb()
     var length = end - start
     var buffer = new Buffer(length)
     fs.read(fd, buffer, 0, length, start, function (err, bytesRead, buffer) {

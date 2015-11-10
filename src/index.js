@@ -1,3 +1,6 @@
-export * from './blob'
-export * from './tree'
-export * from './commit'
+module.exports = Object.assign(
+  {},
+  require('./blob'),
+  require('./tree'),
+  require('./commit')
+)
