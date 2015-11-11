@@ -1,5 +1,5 @@
 'use strict'
-var GitObject = require('./gitobject').GitObject
+var GitObject = require('./gitobject')
 var run = require('gen-run')
 
 class Blob extends GitObject {
@@ -36,5 +36,5 @@ class Blob extends GitObject {
     })
   }
 }
-
-module.exports = { Blob }
+Blob.prototype.mode = parseInt('0100644', 8)
+module.exports = Blob
