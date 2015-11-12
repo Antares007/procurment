@@ -1,6 +1,5 @@
 'use strict'
 const isHash = /^[0123456789abcdef]{40}$/
-var run = require('gen-run')
 
 module.exports = class GitObject {
   constructor (hash) {
@@ -13,25 +12,19 @@ module.exports = class GitObject {
     }
   }
 
-  getHash (git, cb) {
-    if (!cb) return this.getHash.bind(this, git)
-    if (this.hash) return cb(null, this.hash)
-    this.hashFn(git, (err, hash) => {
-      if (err) {
-        this.err = err
-      }
-      this.hash = hash
-      cb(err, hash)
-    })
+  getHash (git) {
+    if (this.hash) return Promise.resolve(this.hash)
+    return this.hashFn(git).then(hash => this.hash = hash)
   }
 
   bind (Type, fn) {
-    var self = this
-    return new Type((git, cb) => run(function * () {
-      var value = yield self.valueOf(git)
+    return new Type(git => this.valueOf(git).then(function (value) {
       var rez = fn(value)
-      // console.log(Type, rez.Constructor)
-      return yield rez.getHash(git)
-    }, cb))
+      if (rez.constructor !== Type) {
+        return Type.prototype.cast(rez).getHash(git)
+      } else {
+        return rez.getHash(git)
+      }
+    }))
   }
 }

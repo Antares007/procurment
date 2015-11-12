@@ -1,26 +1,19 @@
 'use strict'
 var GitObject = require('./gitobject')
-var run = require('gen-run')
 
 class Blob extends GitObject {
   constructor (hash) {
     super(hash)
   }
 
-  valueOf (git, cb) {
-    if (!cb) return this.valueOf.bind(this, git)
-    var self = this
-    run(function * () {
-      var hash = yield self.getHash(git)
-      return yield git.loadAs('blob', hash)
-    }, cb)
+  valueOf (git) {
+    return this.getHash(git).then(function (hash) {
+      return git.loadAs('blob', hash)
+    })
   }
 
   static of (buffer) {
-    return new Blob((git, cb) => run(function * () {
-      var blobHash = yield git.saveAs('blob', buffer)
-      return blobHash
-    }, cb))
+    return new Blob(git => git.saveAs('blob', buffer))
   }
 
   merge (blobs, fn) {
