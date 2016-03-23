@@ -1,6 +1,5 @@
-module.exports = Object.assign(
-  {},
-  require('./blob'),
-  require('./tree'),
-  require('./commit')
-)
+module.exports = {
+  Blob: require('./blob'),
+  Tree: require('./tree'),
+  Commit: require('./commit')
+}

@@ -2,10 +2,6 @@
 var GitObject = require('./gitobject')
 
 class Blob extends GitObject {
-  constructor (hash) {
-    super(hash)
-  }
-
   valueOf (git) {
     return this.getHash(git).then(function (hash) {
       return git.loadAs('blob', hash)
@@ -13,7 +9,17 @@ class Blob extends GitObject {
   }
 
   static of (buffer) {
-    return new Blob(git => git.saveAs('blob', buffer))
+    return new Blob((git) => git.saveAs('blob', buffer))
+  }
+
+  static fromJS (obj) {
+    return Blob.of(new Buffer(JSON.stringify(obj)))
+  }
+
+  static concat (blobs) {
+    return blobs.pop().merge(blobs, function (buffs) {
+      return Buffer.concat(buffs)
+    })
   }
 
   merge (blobs, fn) {

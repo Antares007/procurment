@@ -2,7 +2,7 @@
   "name": "avtomati",
   "version": "1.0.0",
   "description": "",
-  "main": "./lib/index.js",
+  "main": "./src/index.js",
   "bin": {
     "grow": "./bin/grow.js",
     "growold": "./bin/growold.js",
@@ -17,8 +17,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "acorn": "^3.0.4",
+    "astring": "^0.6.0",
     "debug": "^2.2.0",
     "gen-run": "^0.1.2",
+    "ipfs-api": "^2.9.12",
     "mkdirp": "^0.5.1",
     "split": "^1.0.0",
     "yargs": "^3.27.0"

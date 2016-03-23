@@ -15,7 +15,7 @@ process.stdin.pipe(transform(function (chunk, encoding, next) {
   var ds = this
   var engine = require('../src/engine')
   engine.start()
-    .then(git => {
+    .then((git) => {
       var Commit = require('../src/commit').Commit
       var module = require(process.cwd() + '/' + argv._[0])
       var rezCommit = module(new Commit(sha))
@@ -24,7 +24,7 @@ process.stdin.pipe(transform(function (chunk, encoding, next) {
         ds.push(sha)
       })
     })
-    .catch(err => process.nextTick(function () {
+    .catch((err) => process.nextTick(function () {
       ds.emit('error', err)
     }))
 })).pipe(process.stdout)

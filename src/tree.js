@@ -5,12 +5,9 @@ var modes = require('js-git/lib/modes')
 const emptyTreeHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
 class Tree extends GitObject {
-  constructor (hash) {
-    super(hash)
-  }
-
   valueOf (git) {
     return this.getHash(git).then(function (hash) {
+      if (hash === emptyTreeHash) return {}
       return git.loadAs('tree', hash).then(function (entries) {
         var clone = {}
         for (var name of Object.keys(entries)) {
@@ -32,18 +29,17 @@ class Tree extends GitObject {
     var keys = Object.keys(value)
     if (keys.length === 0) return new Tree(emptyTreeHash)
     return new Tree(
-      git => Promise.all(
-        keys.map(name => {
+      (git) => Promise.all(
+        keys.map((name) => {
           var obj = value[name]
-          return obj.getHash(git).then(hash => ({ name, mode: obj.mode, hash }))
+          return obj.getHash(git).then((hash) => ({ name, mode: obj.mode, hash }))
         })
-      ).then(entries => {
-        entries = entries.reduce(
-          (s, e) => (s[e.name] = { mode: e.mode, hash: e.hash }, s),
-          {}
-        )
-        return git.saveAs('tree', entries)
-      })
+      ).then((entries) => git.saveAs('tree', entries.reduce(function (s, e) {
+        if (e.hash === emptyTreeHash) return s
+        s[e.name] = { mode: e.mode, hash: e.hash }
+        return s
+      }, {}))
+      )
     )
   }
 
@@ -70,6 +66,119 @@ class Tree extends GitObject {
       }
     })
   }
+
+  map (fn) {
+    var walk = function (path) {
+      return function (t) {
+        return Object.keys(t).reduce(function (s, name) {
+          var e = t[name]
+          if (e instanceof Tree) {
+            s[name] = e.bind(Tree, walk(path.concat(name)))
+          } else {
+            s[name] = fn(e, path.concat(name))
+          }
+          return s
+        }, {})
+      }
+    }
+    return this.bind(Tree, walk([]))
+  }
+
+  diff (patterns, other) {
+    var retEmpty = () => Tree.empty
+    var addedFn = patterns.added || retEmpty
+    var deletedFn = patterns.deleted || retEmpty
+    var modifiedFn = patterns.modified || retEmpty
+    var equalFn = patterns.equal || retEmpty
+    var diff = function (t1, t2, path) {
+      return t1.bind(Tree, function (t1) {
+        return t2.bind(Tree, function (t2) {
+          var names = new Set(Object.keys(t1).concat(Object.keys(t2)))
+          var rez = {}
+          for (var name of names) {
+            var e1 = t1[name]
+            var e2 = t2[name]
+            if (e1 && e2) {
+              if (e1.hash === e2.hash) {
+                rez[name] = equalFn(e1, e2, path.concat(name))
+              } else {
+                if (e1 instanceof Tree && e2 instanceof Tree) {
+                  rez[name] = diff(e1, e2, path.concat(name))
+                } else {
+                  rez[name] = modifiedFn(e1, e2, path.concat(name))
+                }
+              }
+            } else if (e1) {
+              rez[name] = deletedFn(e1, path.concat(name))
+            } else {
+              rez[name] = addedFn(e2, path.concat(name))
+            }
+          }
+          return rez
+        })
+      })
+    }
+    return diff(this, other, [])
+  }
+
+  merge3 (mergeFn, ours, theirs) {
+    mergeFn = mergeFn || function () {
+      throw new Error('cant merge with default logic')
+    }
+    var merge3 = function (base, ours, theirs, path) {
+      return base.bind(Tree, function (base) {
+        return ours.bind(Tree, function (ours) {
+          return theirs.bind(Tree, function (theirs) {
+            var names = new Set(
+              Object.keys(base)
+                .concat(Object.keys(ours))
+                .concat(Object.keys(theirs))
+            )
+            var rez = {}
+            for (var name of names) {
+              var be = base[name]
+              var oe = ours[name]
+              var te = theirs[name]
+              if (be && oe && te) {
+                if (be.hash === oe.hash && be.hash === te.hash) {
+                  rez[name] = be
+                } else {
+                  if (be instanceof Tree && oe instanceof Tree && te instanceof Tree) {
+                    rez[name] = merge3(be, oe, te, path.concat(name))
+                  } else {
+                    rez[name] = mergeFn(be, oe, te, path.concat(name))
+                  }
+                }
+              } if (te) {
+                if (te.hash === (be || oe).hash) {
+                  rez[name] = Tree.empty
+                } else {
+                  if ((be || oe) instanceof Tree && te instanceof Tree) {
+                    rez[name] = merge3(be || Tree.empty, oe || Tree.empty, te, path.concat(name))
+                  } else {
+                    rez[name] = mergeFn(be, oe, te, path.concat(name))
+                  }
+                }
+              } if (be && !oe) {
+                rez[name] = be
+              } if (oe && !be) {
+                rez[name] = oe
+              } else {
+                if (be instanceof Tree && oe instanceof Tree) {
+                  rez[name] = merge3(be, oe, Tree.empty, path.concat(name))
+                } else {
+                  rez[name] = mergeFn(be, oe, te, path.concat(name))
+                }
+              }
+            }
+            return rez
+          })
+        })
+      })
+    }
+    return merge3(this, ours, theirs, [])
+  }
 }
 Tree.prototype.mode = parseInt('040000', 8)
+Tree.empty = new Tree(emptyTreeHash)
 module.exports = Tree

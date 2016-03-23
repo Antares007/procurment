@@ -21,8 +21,10 @@ module.exports = {
       fs.read(fd, buffer, 0, length, start, function (err, bytesRead, buffer) {
         if (err) return cb(err)
         if (bytesRead !== length) return cb(new Error('fs.readChunk bytesRead !== length'))
-        cb(null, buffer)
-        fs.close(fd)
+        fs.close(fd, function (err) {
+          if (err) return cb(err)
+          cb(null, buffer)
+        })
       })
     })
   }),
