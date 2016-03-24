@@ -68,20 +68,21 @@ class Tree extends GitObject {
   }
 
   map (fn) {
-    var walk = function (path) {
-      return function (t) {
+    function doMap (tree, path) {
+      console.log(path.join('/'))
+      return tree.bind(Tree, function (t) {
         return Object.keys(t).reduce(function (s, name) {
           var e = t[name]
           if (e instanceof Tree) {
-            s[name] = e.bind(Tree, walk(path.concat(name)))
+            s[name] = doMap(e, path.concat(name))
           } else {
             s[name] = fn(e, path.concat(name))
           }
           return s
         }, {})
-      }
+      })
     }
-    return this.bind(Tree, walk([]))
+    return doMap(this, [])
   }
 
   diff (patterns, other) {
