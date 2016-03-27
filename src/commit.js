@@ -1,15 +1,15 @@
 'use strict'
-var GitObject = require('./gitobject')
+var Hashish = require('./hashish')
 var Tree = require('./tree')
 var Blob = require('./blob')
 
-class Commit extends GitObject {
+class Commit extends Hashish {
   valueOf (git) {
     return this.getHash(git).then(function (hash) {
       return git.loadAs('commit', hash).then(function (value) {
         var commit = Object.assign({}, value, {
-          tree: new Tree(value.tree),
-          parents: value.parents.map((hash) => new Commit(hash))
+          tree: Hashish.get(Tree, value.tree),
+          parents: value.parents.map((hash) => Hashish.get(Commit, hash))
         })
         if (commit.parents.length === 0) {
           delete commit.parents
@@ -86,7 +86,7 @@ function grow (oldTree, newRoot) {
   return oldTree.bind(Commit, (oldTreeCommit) => {
     return newRoot.bind(Commit, (newRootCommit) => {
       return oldTreeCommit.parents[1].bind(Commit, (oldRootCommit) => {
-        var script = new Blob(oldTreeCommit.message)
+        var script = Hashish.get(Blob, oldTreeCommit.message)
         var newTree = growSeed(script, oldRootCommit.tree, newRootCommit.tree, oldTreeCommit.tree)
         return Commit.of({
           tree: newTree,

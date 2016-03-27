@@ -1,10 +1,10 @@
 'use strict'
-var GitObject = require('./gitobject')
+var Hashish = require('./hashish')
 var modes = require('js-git/lib/modes')
 
 const emptyTreeHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
-class Tree extends GitObject {
+class Tree extends Hashish {
   valueOf (git) {
     return this.getHash(git).then(function (hash) {
       if (hash === emptyTreeHash) return {}
@@ -14,7 +14,7 @@ class Tree extends GitObject {
           var e = entries[name]
           var type = modes.toType(e.mode)
           var Ctor = require('./' + type)
-          var obj = new Ctor(e.hash)
+          var obj = Hashish.get(Ctor, e.hash)
           if (obj.mode !== e.mode) {
             obj.mode = e.mode
           }
@@ -27,7 +27,7 @@ class Tree extends GitObject {
 
   static of (value) {
     var keys = Object.keys(value)
-    if (keys.length === 0) return new Tree(emptyTreeHash)
+    if (keys.length === 0) return Hashish.get(Tree, emptyTreeHash)
     return new Tree(
       (git) => Promise.all(
         keys.map((name) => {
@@ -67,22 +67,16 @@ class Tree extends GitObject {
     })
   }
 
-  map (fn) {
-    function doMap (tree, path) {
-      console.log(path.join('/'))
+  map (mapFn) {
+    function doMap (tree) {
       return tree.bind(Tree, function (t) {
         return Object.keys(t).reduce(function (s, name) {
-          var e = t[name]
-          if (e instanceof Tree) {
-            s[name] = doMap(e, path.concat(name))
-          } else {
-            s[name] = fn(e, path.concat(name))
-          }
+          s[name] = mapFn(t[name])
           return s
         }, {})
       })
     }
-    return doMap(this, [])
+    return doMap(this)
   }
 
   diff (patterns, other) {
@@ -181,5 +175,5 @@ class Tree extends GitObject {
   }
 }
 Tree.prototype.mode = parseInt('040000', 8)
-Tree.empty = new Tree(emptyTreeHash)
+Tree.empty = Hashish.get(Tree, emptyTreeHash)
 module.exports = Tree

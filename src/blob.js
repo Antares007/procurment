@@ -1,7 +1,7 @@
 'use strict'
-var GitObject = require('./gitobject')
+var Hashish = require('./hashish')
 
-class Blob extends GitObject {
+class Blob extends Hashish {
   valueOf (git) {
     return this.getHash(git).then(function (hash) {
       return git.loadAs('blob', hash)
