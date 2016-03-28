@@ -1,7 +1,10 @@
+var fs = require('./mac-fs.js')
+var crypto = require('crypto')
+
 module.exports = function (gitDir) {
   var repo = {}
   repo.rootPath = gitDir || require('path').resolve(__dirname, '.git')
-  require('js-git/mixins/fs-db')(repo, require('./mac-fs.js'))
+  require('js-git/mixins/fs-db')(repo, fs)
   require('js-git/mixins/read-combiner')(repo)
 
   var api = [
@@ -18,12 +21,29 @@ module.exports = function (gitDir) {
   return api
 }
 
+var readFile = toPromise(fs.readFile)
+var writeFile = toPromise(fs.writeFile)
+var path = require('path')
 function runScript (api, script) {
-  var vm = require('vm')
-  var sendbox = vm.createContext({console, Promise, Buffer, seed: {}})
-  vm.runInContext(script, sendbox)
-  var seed = sendbox.seed()
-  return seed.getHash(api)
+  var fileName = path.resolve(__dirname, '.cache', hash(script))
+  return readFile(fileName).then(function (buff) {
+    if (buff) return Promise.resolve(buff.toString())
+    var vm = require('vm')
+    var sendbox = vm.createContext({console, Promise, Buffer, seed: {}})
+    vm.runInContext(script, sendbox)
+    var seed = sendbox.seed()
+    return seed.getHash(api).then(function (hash) {
+      return writeFile(fileName, new Buffer(hash)).then(function () {
+        return hash
+      })
+    })
+  })
+}
+
+function hash (value) {
+  var shasum = crypto.createHash('sha1')
+  shasum.update(value.toString())
+  return shasum.digest('hex')
 }
 
 function toPromise (fn) {
