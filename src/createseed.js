@@ -21,9 +21,9 @@ module.exports = function (sig, fn) {
   var requires = ["var Hashish = require('avtomati/src/hashish')"].concat(
     Object.keys(typePathDict).map((path) => `var ${typePathDict[path]} = require('${path}')`)
   ).join('\n')
+  var src = requires + '\n\nseed = ' + fn.toString() + '\n//insertion point\n'
   return new Seed(function (git) {
-    return browserify(requires + '\n\nseed = ' + fn.toString() + '\n//insertion point\n')
-      .then((script) => git.saveAs('blob', new Buffer(script, 'utf8')))
+    return browserify(src).then((script) => Seed.of(script).getHash(git))
   })
 }
 
