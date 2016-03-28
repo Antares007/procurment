@@ -1,4 +1,20 @@
+var Hashish = require('./hashish')
 var Seed = require('./seed')
+var Module = require('module')
+
+var original_module_require = Module.prototype.require
+
+Module.prototype.require = function (library) {
+  var explicitSkip = arguments.length >= 2 && arguments[1] === '__skip'
+  if (explicitSkip) {
+    return
+  }
+  var result = original_module_require.apply(this, arguments)
+  if (typeof result === 'function' && (result.prototype instanceof Hashish)) {
+    result.modulePath = library
+  }
+  return result
+}
 
 module.exports = function (sig, fn) {
   var typePathDict = sig.reduce((s, t) => (s[t.modulePath] = t.name, s), {})
