@@ -4,7 +4,7 @@ module.exports = function (gitDir) {
   require('js-git/mixins/fs-db')(repo, require('./mac-fs.js'))
   require('js-git/mixins/read-combiner')(repo)
 
-  return [
+  var api = [
     'init',
     'saveAs',
     'loadAs',
@@ -14,7 +14,18 @@ module.exports = function (gitDir) {
     (s, n) => (s[n] = toPromise(repo[n].bind(repo)), s),
     {}
   )
+  api.runScript = runScript.bind({}, api)
+  return api
 }
+
+function runScript (api, script) {
+  var vm = require('vm')
+  var sendbox = vm.createContext({console, Promise, Buffer, seed: {}})
+  vm.runInContext(script, sendbox)
+  var seed = sendbox.seed()
+  return seed.getHash(api)
+}
+
 function toPromise (fn) {
   return function () {
     var args = Array.prototype.slice.call(arguments)

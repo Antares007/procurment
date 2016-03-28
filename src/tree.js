@@ -1,7 +1,6 @@
 'use strict'
 var Hashish = require('./hashish')
 var modes = require('js-git/lib/modes')
-
 const emptyTreeHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
 class Tree extends Hashish {
@@ -13,7 +12,7 @@ class Tree extends Hashish {
         for (var name of Object.keys(entries)) {
           var e = entries[name]
           var type = modes.toType(e.mode)
-          var Ctor = require('./' + type)
+          var Ctor = dic[type]
           var obj = Hashish.get(Ctor, e.hash)
           if (obj.mode !== e.mode) {
             obj.mode = e.mode
@@ -176,4 +175,9 @@ class Tree extends Hashish {
 }
 Tree.prototype.mode = parseInt('040000', 8)
 Tree.empty = Hashish.get(Tree, emptyTreeHash)
+var dic = {
+  'tree': Tree,
+  'blob': require('./blob'),
+  'commit': require('./commit')
+}
 module.exports = Tree

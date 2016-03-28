@@ -14,7 +14,7 @@ module.exports = class Hashish {
   getHash (git) {
     if (!this.promised) {
       var promise = this.hashFn(git)
-      if (!(promise instanceof Promise)) throw new Error('hashFn dont returns Promise')
+      if (!(promise instanceof Promise)) throw new Error('hashFn dont returns Promise' + this.hashFn.toString())
       this.promised = promise.then((hash) => {
         if (typeof hash !== 'string') throw new Error('promised hash is not string')
         if (!isHash.test(hash)) throw new Error('promised hash is not hash string')

@@ -19,6 +19,7 @@
   "dependencies": {
     "acorn": "^3.0.4",
     "astring": "^0.6.0",
+    "browserify": "^13.0.0",
     "debug": "^2.2.0",
     "gen-run": "^0.1.2",
     "ipfs-api": "^2.9.12",
