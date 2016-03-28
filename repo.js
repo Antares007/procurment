@@ -25,7 +25,9 @@ var readFile = toPromise(fs.readFile)
 var writeFile = toPromise(fs.writeFile)
 var path = require('path')
 function runScript (api, script) {
-  var fileName = path.resolve(__dirname, '.cache', hash(script))
+  var sha = hash(script)
+  sha = sha.slice(0, 2) + '/' + sha.slice(2)
+  var fileName = path.resolve(__dirname, '.cache', sha)
   return readFile(fileName).then(function (buff) {
     if (buff) return Promise.resolve(buff.toString())
     var vm = require('vm')
