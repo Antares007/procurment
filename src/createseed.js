@@ -3,7 +3,7 @@ var Seed = require('./seed')
 var Module = require('module')
 
 var original_module_require = Module.prototype.require
-
+const modulePath = '@module-path'
 Module.prototype.require = function (library) {
   var explicitSkip = arguments.length >= 2 && arguments[1] === '__skip'
   if (explicitSkip) {
@@ -11,13 +11,14 @@ Module.prototype.require = function (library) {
   }
   var result = original_module_require.apply(this, arguments)
   if (typeof result === 'function' && (result.prototype instanceof Hashish)) {
-    result.modulePath = library
+    result[modulePath] = library
   }
   return result
 }
 
 module.exports = function (sig, fn) {
-  var typePathDict = sig.reduce((s, t) => (s[t.modulePath] = t.name, s), {})
+  var typePathDict = sig.filter((t) => t.prototype instanceof Hashish)
+                        .reduce((s, t) => (s[t[modulePath]] = t.name, s), {})
   var requires = ["var Hashish = require('avtomati/src/hashish')"].concat(
     Object.keys(typePathDict).map((path) => `var ${typePathDict[path]} = require('${path}')`)
   ).join('\n')
