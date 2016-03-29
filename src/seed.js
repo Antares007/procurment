@@ -18,7 +18,9 @@ module.exports = class Seed extends Hashish {
     return new Seed((git) => {
       var mapper = (a) => a instanceof Hashish
         ? a.getHash(git).then((hash) => `Hashish.get(${a.constructor.name}, '${hash}')`)
-        : JSON.stringify(a)
+        : typeof a === 'function'
+          ? a.toString()
+          : JSON.stringify(a)
       var promisedValues = args.map(mapper)
       return Promise.all(promisedValues.concat(this.valueOf(git))).then(function (values) {
         var script = values.pop()
