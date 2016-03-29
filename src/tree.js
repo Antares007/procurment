@@ -5,6 +5,11 @@ const emptyTreeHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
 class Tree extends Hashish {
   valueOf (git) {
+    var dic = {
+      'tree': Tree,
+      'blob': require('./blob'),
+      'commit': require('./commit')
+    }
     return this.getHash(git).then(function (hash) {
       if (hash === emptyTreeHash) return {}
       return git.loadAs('tree', hash).then(function (entries) {
@@ -175,9 +180,4 @@ class Tree extends Hashish {
 }
 Tree.prototype.mode = parseInt('040000', 8)
 Tree.empty = Hashish.get(Tree, emptyTreeHash)
-var dic = {
-  'tree': Tree,
-  'blob': require('./blob'),
-  'commit': require('./commit')
-}
 module.exports = Tree
