@@ -14,6 +14,7 @@ module.exports = class Seed extends Hashish {
 
   bind () {
     var args = Array.prototype.slice.call(arguments)
+    if (args.length === 0) return this
     return new Seed((git) => {
       var mapper = (a) => a instanceof Hashish
         ? a.getHash(git).then((hash) => `Hashish.get(${a.constructor.name}, '${hash}')`)
