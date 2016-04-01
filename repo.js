@@ -1,5 +1,4 @@
 var fs = require('./mac-fs.js')
-var crypto = require('crypto')
 
 module.exports = function (gitDir) {
   var repo = {}
@@ -17,35 +16,37 @@ module.exports = function (gitDir) {
     (s, n) => (s[n] = toPromise(repo[n].bind(repo)), s),
     {}
   )
-  api.runScript = runScript.bind({}, api)
+  api.runScript = memoize(runScript.bind({}, api))
   return api
 }
 
-var readFile = toPromise(fs.readFile)
-var writeFile = toPromise(fs.writeFile)
-var path = require('path')
-function runScript (api, script) {
-  var sha = hash(script)
-  sha = sha.slice(0, 2) + '/' + sha.slice(2)
-  var fileName = path.resolve(__dirname, '.cache', sha)
-  return readFile(fileName).then(function (buff) {
-    if (buff) return Promise.resolve(buff.toString())
+function runScript (api, seedHash) {
+  return api.loadAs('blob', seedHash).then(function (buff) {
+    var script = buff.toString('utf8')
     var vm = require('vm')
     var sendbox = vm.createContext({console, Promise, Buffer, seed: {}})
     vm.runInContext(script, sendbox)
-    var seed = sendbox.seed()
-    return seed.getHash(api).then(function (hash) {
-      return writeFile(fileName, new Buffer(hash)).then(function () {
-        return hash
-      })
-    })
+    var rez = sendbox.seed()
+    return rez.getHash(api)
   })
 }
 
-function hash (value) {
-  var shasum = crypto.createHash('sha1')
-  shasum.update(value.toString())
-  return shasum.digest('hex')
+function memoize (fn) {
+  var readFile = toPromise(fs.readFile)
+  var writeFile = toPromise(fs.writeFile)
+  var path = require('path')
+  return function (seedHash) {
+    var cacheFileName = path.resolve(__dirname, '.cache', seedHash.slice(0, 2) + '/' + seedHash.slice(2))
+    return readFile(cacheFileName).then(function (buff) {
+      if (buff) return Promise.resolve(buff.toString())
+      var rez = fn(seedHash)
+      return rez.then(function (hash) {
+        return writeFile(cacheFileName, new Buffer(hash)).then(function () {
+          return hash
+        })
+      })
+    })
+  }
 }
 
 function toPromise (fn) {

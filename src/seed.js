@@ -37,10 +37,8 @@ module.exports = class Seed extends Hashish {
     var args = Array.prototype.slice.call(arguments)
     var RetType = args[0]
     var seedArgs = args.slice(1)
-    return new RetType((git) => this.bind.apply(this, seedArgs).valueOf(git).then(function (script) {
-      var rez = git.runScript(script)
-      return rez
-    }))
+    var seed = this.bind.apply(this, seedArgs)
+    return new RetType((git) => seed.getHash(git).then(git.runScript))
   }
 }
 
