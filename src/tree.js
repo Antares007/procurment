@@ -1,27 +1,36 @@
 'use strict'
 var Hashish = require('./hashish')
-var modes = require('js-git/lib/modes')
 const emptyTreeHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+
+const blob = parseInt('100644', 8)
+const tree = parseInt('40000', 8)
+const commit = parseInt('160000', 8)
+
+// parseInt( '40000', 8)  tree:
+// parseInt('100644', 8)  blob:
+// parseInt('100644', 8)  file:
+// parseInt('100755', 8)  exec:
+// parseInt('120000', 8)  sym:
+// parseInt('160000', 8)  commit:
+
+function toType (mode) {
+  if ((mode & blob) === blob) return require('./blob')
+  if (mode === tree) return require('./tree')
+  if (mode === commit) return require('./commit')
+  throw new Error('mode not supported')
+}
 
 class Tree extends Hashish {
   valueOf (git) {
-    var dic = {
-      'tree': Tree,
-      'blob': require('./blob'),
-      'commit': require('./commit')
-    }
     return this.getHash(git).then(function (hash) {
       if (hash === emptyTreeHash) return {}
       return git.loadAs('tree', hash).then(function (entries) {
         var clone = {}
         for (var name of Object.keys(entries)) {
-          var e = entries[name]
-          var type = modes.toType(e.mode)
-          var Ctor = dic[type]
-          var obj = Hashish.get(Ctor, e.hash)
-          if (obj.mode !== e.mode) {
-            obj.mode = e.mode
-          }
+          let e = entries[name]
+          let Ctor = toType(e.mode)
+          let obj = new Ctor(() => Promise.resolve(e.hash))
+          obj.mode = e.mode
           clone[name] = obj
         }
         return clone

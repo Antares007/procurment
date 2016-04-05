@@ -1,50 +1,41 @@
 'use strict'
-const isHash = /^[0123456789abcdef]{40}$/
-
-module.exports = class Hashish {
+class Hashish {
   static get (Type, hash) {
     return new Type((git) => Promise.resolve(hash))
   }
 
-  constructor (hash) {
-    if (typeof hash !== 'function') throw new Error('argument error')
-    this.hashFn = hash
+  constructor (hashFn) {
+    if (typeof hashFn !== 'function') throw new Error('argument error')
+    this.hashFn = hashFn
   }
 
   getHash (git) {
-    if (!this.promised) {
-      var promise = this.hashFn(git)
-      if (!(promise instanceof Promise)) throw new Error('hashFn dont returns Promise' + this.hashFn.toString())
-      this.promised = promise.then((hash) => {
-        if (typeof hash !== 'string') throw new Error('promised hash is not string')
-        if (!isHash.test(hash)) throw new Error('promised hash is not hash string')
-        this.hash = hash
-        return hash
-      })
-    }
-    return this.promised
+    return this.hashFn(git)
   }
 
   bind (Type, fn) {
-    return new Type((git) => this.valueOf(git).then(function (value) {
-      var rez = fn(value)
-      if (rez instanceof Hashish) {
-        if (rez.constructor !== Type) {
-          return Type.prototype.cast(rez).getHash(git)
-        } else {
-          return rez.getHash(git)
-        }
-      } else {
-        return Type.of(rez).getHash(git)
-      }
-    }))
-  }
-
-  valueOf (git) {
-    throw new Error('abstact valueOf')
-  }
-
-  cast (value) {
-    throw new Error('cant cast ' + value.constructor.name + ' to ' + this.constructor.name)
+    return new Type(
+      (ipfs) => valueOf.call(this, ipfs).then(function (value) {
+        return fn(value).getHash(ipfs)
+      })
+    )
   }
 }
+
+module.exports = Hashish
+// var valuesMap = new WeakMap()
+function valueOf (ipfs) {
+  // if (valuesMap.has(this)) return valuesMap.get(this)
+  var valuePromise = this.valueOf(ipfs)
+  // valuesMap.set(this, valuePromise)
+  return valuePromise
+}
+
+// var hashMap = new WeakMap()
+// var old_getHash = Hashish.prototype.getHash
+// Hashish.prototype.getHash = function (ipfs) {
+//   if (hashMap.has(this)) return hashMap.get(this)
+//     var hashPromise = old_getHash.call(this, ipfs)
+//   hashMap.set(this, hashPromise)
+//   return hashPromise
+// }

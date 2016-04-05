@@ -17,7 +17,19 @@ module.exports = function (gitDir) {
     {}
   )
   api.runScript = memoize(runScript.bind({}, api))
-  return api
+  return {
+    valueOf: function (obj) {
+      return obj.valueOf(api)
+    },
+    get: function (Type, hash) {
+      var o = new Type(() => Promise.resolve(hash))
+      o.valueOf = o.valueOf.bind(o, api)
+      return o
+    },
+    getHash: function (obj) {
+      return obj.getHash(api)
+    }
+  }
 }
 
 function runScript (api, seedHash) {
