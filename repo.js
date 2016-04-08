@@ -1,37 +1,46 @@
 var fs = require('./mac-fs.js')
+var Tree = require('./src/tree')
+var sha1 = require('git-sha1')
 
 module.exports = function (gitDir) {
   var repo = {}
   repo.rootPath = gitDir || require('path').resolve(__dirname, '.git')
   require('js-git/mixins/fs-db')(repo, fs)
   require('js-git/mixins/read-combiner')(repo)
-
-  var api = [
-    'init',
-    'saveAs',
-    'loadAs',
-    'readRef',
-    'updateRef'
-  ].reduce(
-    (s, n) => (s[n] = toPromise(repo[n].bind(repo)), s),
-    {}
-  )
-  api.runScript = memoize(runScript.bind({}, api))
-  return {
-    valueOf: function (obj) {
-      return obj.valueOf(api)
+  var api = {
+    valueOf: function (hash) {
+      return new Promise(function (resolve, reject) {
+        repo.loadRaw(hash, function (err, buffer) {
+          if (err) { reject(err) } else { resolve(buffer) }
+        })
+      })
     },
-    get: function (Type, hash) {
-      var o = new Type(() => Promise.resolve(hash))
-      o.valueOf = o.valueOf.bind(o, api)
-      return o
-    },
-    getHash: function (obj) {
-      return obj.getHash(api)
+    hash: function (buffer) {
+      return new Promise(function (resolve, reject) {
+        var hash = sha1(buffer)
+        repo.saveRaw(hash, buffer, function (err) {
+          if (err) { reject(err) } else { resolve(hash) }
+        })
+      })
     }
   }
+  return api
 }
 
+/* eslint-disable */
+function createModule (imports, fn) {
+  var fnstr = fn.toString()
+  var body = fnstr.substring(fnstr.indexOf('{') + 1, fnstr.lastIndexOf('}'))
+  var importNames = fnstr.substring(fnstr.indexOf('(') + 1, fnstr.indexOf(')'))
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((name, i) => imports[i].getHash(api).then((hash) => ({ name, hash })))
+  Promise.all(importNames).then(function (importNames) {
+    console.log(importNames)
+  })
+  return Tree.of({})
+}
 function runScript (api, seedHash) {
   return api.loadAs('blob', seedHash).then(function (buff) {
     var script = buff.toString('utf8')
@@ -60,7 +69,6 @@ function memoize (fn) {
     })
   }
 }
-
 function toPromise (fn) {
   return function () {
     var args = Array.prototype.slice.call(arguments)

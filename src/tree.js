@@ -1,61 +1,55 @@
 'use strict'
-var Hashish = require('./hashish')
+const Hashish = require('./hashish')
+const Blob = require('./blob')
 const emptyTreeHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
-
-const blob = parseInt('100644', 8)
-const tree = parseInt('40000', 8)
-const commit = parseInt('160000', 8)
-
-// parseInt( '40000', 8)  tree:
-// parseInt('100644', 8)  blob:
-// parseInt('100644', 8)  file:
-// parseInt('100755', 8)  exec:
-// parseInt('120000', 8)  sym:
-// parseInt('160000', 8)  commit:
-
-function toType (mode) {
-  if ((mode & blob) === blob) return require('./blob')
-  if (mode === tree) return require('./tree')
-  if (mode === commit) return require('./commit')
-  throw new Error('mode not supported')
-}
+var codec = require('js-git/lib/object-codec')
 
 class Tree extends Hashish {
-  valueOf (git) {
-    return this.getHash(git).then(function (hash) {
-      if (hash === emptyTreeHash) return {}
-      return git.loadAs('tree', hash).then(function (entries) {
-        var clone = {}
-        for (var name of Object.keys(entries)) {
-          let e = entries[name]
-          let Ctor = toType(e.mode)
-          let obj = new Ctor(() => Promise.resolve(e.hash))
-          obj.mode = e.mode
-          clone[name] = obj
-        }
-        return clone
-      })
+  valueOf (api) {
+    return super.valueOf(api).then(function (buffer) {
+      var raw = codec.deframe(buffer)
+      if (raw.type !== 'tree') throw new Error('not tree')
+      var entries = codec.decoders[raw.type](raw.body)
+
+      return Object.keys(entries).reduce(function (tree, name) {
+        var e = entries[name]
+        var mode = e.mode.toString(8)
+        var copyData = (api_) => api === api_
+          ? Promise.resolve(e.hash)
+          : api.valueOf(e.hash).then(api_.hash)
+        var obj = mode === '40000' || mode === '160000'
+          ? new Tree(copyData)
+          : new Blob(copyData)
+        obj.mode = e.mode
+        tree[name] = obj
+        return tree
+      }, {})
     })
   }
 
   static of (value) {
     var keys = Object.keys(value)
-    if (keys.length === 0) return Hashish.get(Tree, emptyTreeHash)
+    if (keys.length === 0) return new Tree(() => Promise.resolve(emptyTreeHash))
     return new Tree(
-      (git) => Promise.all(
+      (api) => Promise.all(
         keys.map((name) => {
           var obj = value[name]
-          return obj.getHash(git).then((hash) => ({ name, mode: obj.mode, hash }))
+          return obj.getHash(api).then((hash) => ({ name, mode: obj.mode, hash }))
         })
-      ).then((entries) => git.saveAs('tree', entries.reduce(function (s, e) {
-        if (e.hash === emptyTreeHash) return s
-        s[e.name] = { mode: e.mode, hash: e.hash }
-        return s
-      }, {}))
-      )
+      ).then((entries) => {
+        var tree = entries.reduce(function (s, e) {
+          if (e.hash === emptyTreeHash) return s
+          var mode = e.mode || parseInt(e instanceof Tree ? '40000' : '100644', 8)
+          s[e.name] = { mode, hash: e.hash }
+          return s
+        }, {})
+        var buffer = codec.frame({
+          type: 'tree',
+          body: codec.encoders['tree'](tree)
+        })
+        return Hashish.of(buffer).getHash(api)
+      })
     )
   }
 }
-Tree.prototype.mode = parseInt('040000', 8)
-Tree.empty = Hashish.get(Tree, emptyTreeHash)
 module.exports = Tree
