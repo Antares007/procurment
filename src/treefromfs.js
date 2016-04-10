@@ -15,6 +15,9 @@ function dir (path) {
 }
 
 function tree (path, filter) {
+  if (typeof path === 'string') {
+    path = path.split('/')
+  }
   filter = filter || (() => true)
   return new Tree(
     (git) => dir(path).then(function (ls) {

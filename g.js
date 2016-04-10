@@ -15,6 +15,7 @@ var tree = value.bind(Blob, function rec (path, t) {
       : Blob.of(new Buffer(path.concat(name).join('/') + '\n'))
   }).reduce((b1, b2) => b1.bind(Blob, (buff1) => b2.bind(Blob, (buff2) => Blob.of(Buffer.concat([buff1, buff2])))))
 }.bind({}, []))
+
 repo.getHash(tree)
   .then((value) => console.log(value.toString()))
   .catch((err) => console.log(err.stack))

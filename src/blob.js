@@ -1,22 +1,16 @@
 'use strict'
-var Hashish = require('./hashish')
-var codec = require('js-git/lib/object-codec')
+var GitObject = require('./gitobject')
 
-class Blob extends Hashish {
+class Blob extends GitObject {
   valueOf (api) {
-    return super.valueOf(api).then(function (buff) {
-      var raw = codec.deframe(buff)
-      if (raw.type !== 'blob') throw new Error('not blob')
-      return raw.body
+    return super.valueOf(api).then(function (go) {
+      if (go.type !== 'blob') throw new Error('not a blob')
+      return go.body
     })
   }
 
   static of (buffer) {
-    var raw = codec.frame({
-      type: 'blob',
-      body: codec.encoders['blob'](buffer)
-    })
-    return Hashish.of(raw).castTo(Blob)
+    return GitObject.of({ type: 'blob', body: buffer }).castTo(Blob)
   }
 }
 module.exports = Blob

@@ -11,7 +11,13 @@ module.exports = function (gitDir) {
     valueOf: function (hash) {
       return new Promise(function (resolve, reject) {
         repo.loadRaw(hash, function (err, buffer) {
-          if (err) { reject(err) } else { resolve(buffer) }
+          if (!buffer) {
+            reject(new Error('dont exists'))
+          } else if (err) {
+            reject(err)
+          } else {
+            resolve(buffer)
+          }
         })
       })
     },
