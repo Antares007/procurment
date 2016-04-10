@@ -17,22 +17,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "acorn": "^3.0.4",
-    "astring": "^0.6.0",
-    "browserify": "^13.0.0",
-    "bs58": "^3.0.0",
-    "deasync": "^0.1.4",
-    "debug": "^2.2.0",
-    "gen-run": "^0.1.2",
     "git-sha1": "^0.1.2",
-    "ipfs": "^0.4.4",
-    "ipfs-api": "^2.13.2",
-    "ipfs-merkle-dag": "^0.3.0",
-    "ipfs-unixfs": "^0.1.1",
-    "js-ipfs": "0.0.2",
-    "mkdirp": "^0.5.1",
-    "multihashing": "^0.2.0",
-    "split": "^1.0.0",
-    "yargs": "^3.27.0"
+    "mkdirp": "^0.5.1"
   }
 }
