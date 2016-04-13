@@ -6,21 +6,38 @@ var Json = require('./src/json')
 var Blob = require('./src/blob')
 var Tree = require('./src/tree')
 
-var srcTree = require('./src/treefromfs')(['src'], (x) => x.name.endsWith('.js'))
+// var xlsx = require('../example/seeds/excel2fs')
+// var fs = require('fs')
+// console.log(xlsx.xlsx.read(fs.readFileSync('../Anvol/modzraobebi/merani/gakidvebi/posisChascoreba01.06.2013.xlsx')))
 
-Tree.of({
+var srcTree = require('./src/treefromfs')(['src'], (x) => x.name.endsWith('.js'))
+var xlsxTree = require('./src/treefromfs')('../example/seeds/excel2fs'.split('/'))
+
+var seed = Tree.of({
+  excel: xlsxTree,
   lib: srcTree,
   'index.js': fnBodyAsBlob(function () {
     var Tree = require('./lib/tree.js')
     var Blob = require('./lib/blob.js')
+    var xlsx = require('./excel')
     module.exports = function () {
       return Tree.of({
         hello: Blob.of(new Buffer('world'))
       })
     }
+  }),
+  'package.json': Json.of({
+    main: 'index.js'
   })
 })
-  // .bind(Tree, t => Tree.of(t))
+
+Tree.of({
+  seed,
+  'index.js': fnBodyAsBlob(function () {
+    var seed = require('./seed')
+    module.exports = seed
+  })
+})
   .getHash(repo)
   .then((value) => console.log(value))
   .catch((err) => console.log(err.stack))
