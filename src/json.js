@@ -7,7 +7,7 @@ class Json extends Blob {
     })
   }
   static of (array) {
-    return Blob.of(new Buffer(JSON.stringify(array), 'utf8')).castTo(Json)
+    return Blob.of(new Buffer(JSON.stringify(array, null, '  '), 'utf8')).castTo(Json)
   }
 }
 module.exports = Json

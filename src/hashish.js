@@ -33,3 +33,12 @@ class Hashish {
   }
 }
 module.exports = Hashish
+
+var oldValueOf = Hashish.prototype.valueOf
+var valuesCache = new Map()
+Hashish.prototype.valueOf = function (api) {
+  if (valuesCache.has(this)) return valuesCache.get(this)
+  var rez = oldValueOf.call(this, api)
+  valuesCache.set(this, rez)
+  return rez
+}
