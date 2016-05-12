@@ -3,38 +3,31 @@ const GitObject = require('./gitobject')
 var Tree = require('./tree')
 
 class Commit extends GitObject {
-  valueOf (api) {
-    return super.valueOf(api).then(function (go) {
+  valueOf (repo) {
+    return super.valueOf(repo).then(function (go) {
       if (go.type !== 'commit') throw new Error('not a commit')
       var value = decodeCommit(go.body)
-      var tree = new Tree((api_) => api.valueOf(value.tree).then(api_.hash))
+      var tree = repo.get(Tree, value.tree)
       tree.hash = value.tree
       var commit = Object.assign({}, value, {
         tree,
         parents: value.parents.map(function (hash) {
-          var c = new Commit((api_) => api.valueOf(hash).then(api_.hash))
+          var c = repo.get(Commit, hash)
           c.hash = hash
           return c
         })
       })
-      if (commit.parents.length === 0) {
-        delete commit.parents
-      }
       return commit
     })
   }
 
   static of (def) {
-    var objs = (def.parents || []).concat(def.tree)
     return new Commit(
-      (api) => Promise.all(objs.map((o) => o.getHash(api))).then((hashes) => {
-        var treeHash = hashes.pop()
-        var parentHases = hashes
-        var commit = Object.assign({}, def, { tree: treeHash, parents: parentHases })
-        return GitObject.of({
-          type: 'commit',
-          body: encodeCommit(commit)
-        }).getHash(api)
+      (repo) => Promise.all((def.parents || []).map((o) => o.getHash(repo))).then((parentHashes) => {
+        return def.tree.getHash(repo).then(function (treeHash) {
+          var commit = Object.assign({}, def, { tree: treeHash, parents: parentHashes })
+          return GitObject.of({ type: 'commit', body: encodeCommit(commit) }).getHash(repo)
+        })
       })
     )
   }

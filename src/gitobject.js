@@ -2,8 +2,8 @@
 var Hashish = require('./hashish')
 
 class GitObject extends Hashish {
-  valueOf (api) {
-    return super.valueOf(api).then(function (buffer) {
+  valueOf (repo) {
+    return super.valueOf(repo).then(function (buffer) {
       var space = buffer.indexOf(0x20)
       if (space < 0) throw new Error('Invalid git object buffer')
       var nil = buffer.indexOf(0x00, space)

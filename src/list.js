@@ -16,12 +16,12 @@ class List extends Tree {
     }).castTo(List)
   }
 
-  valueOf (api) {
+  valueOf (repo) {
     var array = []
-    return super.valueOf(api).then(function (tree) {
-      return tree.blocks.valueOf(api).then(function (tree) {
+    return super.valueOf(repo).then(function (tree) {
+      return tree.blocks.valueOf(repo).then(function (tree) {
         return Promise.all(
-          Object.keys(tree).map((name) => tree[name].castTo(Json).valueOf(api).then(function (array2) {
+          Object.keys(tree).map((name) => tree[name].castTo(Json).valueOf(repo).then(function (array2) {
             for (var i2 = 0, len = array2.length; i2 < len; i2++) {
               let index = parseInt(name, 10) * 10 + i2
               array[index] = array2[i2]

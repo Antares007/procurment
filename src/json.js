@@ -1,8 +1,8 @@
 'use strict'
 var Blob = require('./blob')
 class Json extends Blob {
-  valueOf (git) {
-    return super.valueOf(git).then(function (buffer) {
+  valueOf (repo) {
+    return super.valueOf(repo).then(function (buffer) {
       return JSON.parse(buffer.toString('utf8'))
     })
   }

@@ -8,16 +8,13 @@ const modeOfBlob = parseInt('100644', 8)
 const modeOfCommit = parseInt('160000', 8)
 
 class Tree extends GitObject {
-  valueOf (api) {
-    return super.valueOf(api).then(function (go) {
+  valueOf (repo) {
+    return super.valueOf(repo).then(function (go) {
       if (go.type !== 'tree') throw new Error('not a tree')
       var entries = decodeTree(go.body)
       return Object.keys(entries).reduce(function (tree, name) {
         var e = entries[name]
-        var copyData = (api_) => api === api_
-          ? Promise.resolve(e.hash)
-          : api.valueOf(e.hash).then(api_.hash)
-        var obj = e.mode === modeOfTree || e.mode === modeOfCommit ? new Tree(copyData) : new Blob(copyData)
+        var obj = e.mode === modeOfTree || e.mode === modeOfCommit ? repo.get(Tree, e.hash) : repo.get(Blob, e.hash)
         obj.hash = e.hash
         obj.mode = e.mode
         tree[name] = obj
@@ -30,10 +27,10 @@ class Tree extends GitObject {
     var keys = Object.keys(value)
     if (keys.length === 0) return new Tree(() => Promise.resolve(emptyTreeHash))
     return new Tree(
-      (api) => Promise.all(
+      (repo) => Promise.all(
         keys.map((name) => {
           var obj = value[name]
-          return obj.getHash(api).then((hash) => ({
+          return obj.getHash(repo).then((hash) => ({
             name,
             hash,
             mode: obj.mode || (obj instanceof Tree ? modeOfTree : modeOfBlob)
@@ -44,7 +41,7 @@ class Tree extends GitObject {
           s[e.name] = { mode: e.mode, hash: e.hash }
           return s
         }, {})
-        return GitObject.of({ type: 'tree', body: encodeTree(tree) }).getHash(api)
+        return GitObject.of({ type: 'tree', body: encodeTree(tree) }).getHash(repo)
       })
     )
   }
