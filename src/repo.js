@@ -1,36 +1,52 @@
 var fs = require('./mac-fs.js')
-var Tree = require('./src/tree')
+var Tree = require('gittypes/tree')
 var sha1 = require('git-sha1')
 
 module.exports = function (gitDir) {
   var repo = {}
   repo.rootPath = gitDir || require('path').resolve(__dirname, '.git')
   require('js-git/mixins/fs-db')(repo, fs)
-  require('js-git/mixins/read-combiner')(repo)
+  // require('js-git/mixins/read-combiner')(repo)
   var api = {
-    valueOf: function (hash) {
-      return new Promise(function (resolve, reject) {
-        repo.loadRaw(hash, function (err, buffer) {
-          if (!buffer) {
-            reject(new Error('dont exists'))
-          } else if (err) {
-            reject(err)
-          } else {
-            resolve(buffer)
-          }
-        })
-      })
-    },
-    hash: function (buffer) {
-      return new Promise(function (resolve, reject) {
-        var hash = sha1(buffer)
-        repo.saveRaw(hash, buffer, function (err) {
-          if (err) { reject(err) } else { resolve(hash) }
-        })
-      })
-    }
+    path: repo.rootPath,
+    valueOf,
+    hash,
+    has
   }
   return api
+
+  function hash (buffer) {
+    return new Promise(function (resolve, reject) {
+      var hash = sha1(buffer)
+      repo.saveRaw(hash, buffer, function (err) {
+        if (err) { reject(err) } else { resolve(hash) }
+      })
+    })
+  }
+  function valueOf (hash) {
+    return new Promise(function (resolve, reject) {
+      repo.loadRaw(hash, function (err, buffer) {
+        if (!buffer) {
+          reject(new Error(`hash [${hash}] dont exists`))
+        } else if (err) {
+          reject(err)
+        } else {
+          resolve(buffer)
+        }
+      })
+    })
+  }
+  function has (hash) {
+    return new Promise(function (resolve, reject) {
+      repo.loadRaw(hash, function (err, buffer) {
+        if (err) {
+          reject(err)
+        } else {
+          resolve(!!buffer)
+        }
+      })
+    })
+  }
 }
 
 /* eslint-disable */

@@ -5,8 +5,7 @@
   "main": "./src/index.js",
   "bin": {
     "grow": "./bin/grow.js",
-    "growold": "./bin/growold.js",
-    "plant": "./bin/plant.js"
+    "hashdir": "./bin/hashdir.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

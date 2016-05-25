@@ -1,6 +1,6 @@
 'use strict'
-var Tree = require('./tree')
-var Blob = require('./blob')
+var Tree = require('gittypes/tree')
+var Blob = require('gittypes/blob')
 var fs = require('fs')
 var stat = toPromise(fs.stat.bind(fs))
 var readDir = toPromise(fs.readdir.bind(fs))

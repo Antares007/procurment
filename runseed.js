@@ -1,61 +1,40 @@
-var path = require('path')
-
-var repo = require('./repo')(path.resolve(__dirname, '.git'))
-
-var Json = require('./src/json')
-var Blob = require('./src/blob')
+var resolve = require('path').resolve
+var repo = require('./repo')
+var anvolRepo = repo(resolve(__dirname, '../Anvol/.git'))
+var aviRepo = repo(resolve(__dirname, '.git'))
 var Tree = require('./src/tree')
+// var Seed = require('./src/seed')
+var Blob = require('./src/blob')
+var Commit = require('./src/commit')
+var Hashish = require('./src/hashish')
 
-// var xlsx = require('../example/seeds/excel2fs')
-// var fs = require('fs')
-// console.log(xlsx.xlsx.read(fs.readFileSync('../Anvol/modzraobebi/merani/gakidvebi/posisChascoreba01.06.2013.xlsx')))
+var anvolTreeCommit = Hashish.get(Commit, anvolRepo, 'c190338126fcae417668c755448975d1f7132eec')
 
-var srcTree = require('./src/treefromfs')(['src'], (x) => x.name.endsWith('.js'))
-var xlsxTree = require('./src/treefromfs')('../example/seeds/excel2fs'.split('/'))
+// var anvolTree = Hashish.get(Tree, anvolRepo, 'd9bd6a75ce3fc0028d32ba4b9c3462d1e6ee7271')
+// var anvolTree = anvolTreeCommit.bind(Tree, (c) => c.tree)
 
-var seed = Tree.of({
-  excel: xlsxTree,
-  lib: srcTree,
-  'index.js': fnBodyAsBlob(function () {
-    var Tree = require('./lib/tree.js')
-    var Blob = require('./lib/blob.js')
-    var xlsx = require('./excel')
-    module.exports = function () {
-      return Tree.of({
-        hello: Blob.of(new Buffer('world'))
+var anvolSoft = importDir('../AnvolSoft')
+  .bind(Tree, function (t) {
+    return {
+      anvolTreeCommit,
+      seed: Tree.of(t),
+      'index.js': fnBodyAsBlob(function () {
+        var seed = require('./seed')
+        module.exports = function () {
+          return seed(module.tree)
+        }
       })
     }
-  }),
-  'package.json': Json.of({
-    main: 'index.js'
   })
-})
 
-Tree.of({
-  seed,
-  'index.js': fnBodyAsBlob(function () {
-    var seed = require('./seed')
-    module.exports = seed
-  })
-})
-  .getHash(repo)
+anvolSoft
+  .valueOf(aviRepo)
   .then((value) => console.log(value))
   .catch((err) => console.log(err.stack))
 
-function toTree (imports, fn) {
-  var fnstr = fn.toString()
-  var body = fnstr.substring(fnstr.indexOf('{') + 1, fnstr.lastIndexOf('}'))
-  return fnstr.substring(fnstr.indexOf('(') + 1, fnstr.indexOf(')'))
-    .split(',')
-    .map((x) => x.trim())
-    .filter(Boolean)
-    .reduce(function (tree, name, i) {
-      var value = imports[i]
-      console.log(name, i, value)
-      return tree
-    }, {
-      'index.js': Blob.of(body)
-    })
+function importDir (dir) {
+  var readdir = require('./src/treefromfs')
+  return readdir(dir, (e) => e.name !== '.git' || !e.stats.isDirectory())
 }
 
 function fnBodyAsBlob (fn) {
