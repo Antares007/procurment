@@ -11,12 +11,7 @@ module.exports = function (api, treeHash) {
       .catch((err) => cb(err))
   })
 
-  var entries = prependPath(ls(treeHash), '/')
-  entries['/'] = { hash: treeHash, type: 'Tree' }
-
-  function prependPath (v, pre) {
-    return Object.keys(v).reduce((s, path) => (s[join(pre, path)] = v[path], s), {})
-  }
+  var entries = ls(treeHash)
 
   function ls (treeHash) {
     var t = valueOf(loadObj(Tree, treeHash))
@@ -36,9 +31,13 @@ module.exports = function (api, treeHash) {
       .concat(list)
       .reduce((v1, v2) => Object.assign(v1, v2))
   }
+  function prependPath (v, pre) {
+    return Object.keys(v).reduce((s, path) => (s[join(pre, path)] = v[path], s), {})
+  }
+
   return mkMemoizer()(function (path) {
     path = path.toLowerCase()
-    var entry = entries[path]
+    var entry = entries[path.slice(1)]
     if (entry && entry.type === 'Blob') {
       return {
         hash: entry.hash,
