@@ -20,6 +20,7 @@ module.exports = function (api, seedHash) {
   var seedTree = loadObj(Tree, seedHash)
 
   var entries = valueOf(ls(seedTree, ['']))
+  entries['/'] = { hash: seedHash, type: 'Tree' }
 
   var getModule = mkMemoizer()(function (path) {
     path = path.toLowerCase()
@@ -44,6 +45,7 @@ module.exports = function (api, seedHash) {
     var id = mdl.hash
     debug(`load(cached = ${!!cache[id]})`, path)
     if (cache[id]) return cache[id]
+    var dir = dirname(path)
     var code = mdl.content
     var wrappedCode = `(module, exports, require, __filename, __dirname) => {\n${code}\n}`
     var opt = { filename: path, lineOffset: 0, displayErrors: true }
@@ -59,7 +61,7 @@ module.exports = function (api, seedHash) {
     // 3. LOAD_NODE_MODULES(X, dirname(Y))
     // 4. THROW "not found"
     var require = function (x) {
-      var y = dirname(path)
+      var y = dir
       var rez
       debug(`require(${x}) at ${path}`)
       if ((rez = loadCoreModule(x))) return rez
@@ -70,9 +72,9 @@ module.exports = function (api, seedHash) {
       if ((rez = loadNodeModules(x, y))) return rez
       throw new Error('not found ' + x + ' at ' + y)
     }
-    var module = { exports: {} }
+    var module = { exports: {}, hash: entries[path].hash }
 
-    compiledWrapper(module, module.exports, require, path, dirname(path))
+    compiledWrapper(module, module.exports, require, path, dir)
     cache[id] = module.exports
     return module.exports
   }
