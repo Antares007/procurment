@@ -21,7 +21,8 @@ module.exports = function (api, seedHash) {
 
   var entries = valueOf(ls(seedTree, ['']))
   entries['/'] = { hash: seedHash, type: 'Tree' }
-
+  console.log(entries)
+  return
   var getModule = mkMemoizer()(function (path) {
     path = path.toLowerCase()
     var entry = entries[path]
@@ -155,21 +156,21 @@ function loadCoreModule (x) {
   return mods[x]
 }
 
-function ls (tree, path) {
+function ls (tree) {
   return tree.bind(Json, function (t) {
     var enames = Object.keys(t)
     var trees = []
     var list = enames.reduce(function (s, name) {
       var e = t[name]
-      var epath = path.concat(name.toLowerCase())
+      name = name.toLowerCase()
       if (e instanceof Tree) {
-        trees.push({ path: epath, tree: e })
+        trees.push({ name, tree: e })
       }
-      s[epath.join('/')] = { type: e.constructor.name, hash: e.hash }
+      s[name] = { type: e.constructor.name, hash: e.hash }
       return s
     }, {})
     return trees
-      .map((x) => ls(x.tree, x.path))
+      .map((x) => ls(x.tree).bind(Json, (v) => Object.keys(v).reduce((s, path) => (s[join(x.name, path)], s), {})))
       .concat(Json.of(list))
       .reduce((j1, j2) => j1.bind(Json, (v1) => j2.bind(Json, (v2) => Object.assign(v1, v2))))
   })
