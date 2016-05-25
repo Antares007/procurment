@@ -1,44 +1,15 @@
 'use strict'
-const deasync = require('deasync')
 const debug = require('debug')('module')
 const runInThisContext = require('vm').runInThisContext
 const join = require('path').join
 const dirname = require('path').dirname
 
-const Blob = require('gittypes/blob')
-const Tree = require('gittypes/tree')
-const Json = require('gittypes/json')
-
 module.exports = function (api, seedHash) {
-  const valueOf = deasync(function (hashish, cb) {
-    hashish
-      .valueOf(api)
-      .then((v) => cb(null, v))
-      .catch((err) => cb(err))
-  })
-
-  var seedTree = loadObj(Tree, seedHash)
-
-  var entries = valueOf(ls(seedTree, ['']))
-  entries['/'] = { hash: seedHash, type: 'Tree' }
-  console.log(entries)
-  return
-  var getModule = mkMemoizer()(function (path) {
-    path = path.toLowerCase()
-    var entry = entries[path]
-    if (entry && entry.type === 'Blob') {
-      return {
-        hash: entry.hash,
-        content: valueOf(loadObj(Blob, entry.hash)).toString()
-      }
-    } else {
-      return null
-    }
-  })
-
+  var getModule = require('./fileloader')(api, seedHash)
   var cache = {}
 
   global.seedHash = seedHash
+
   var exports = loadAsDirectory('/')
   return exports
 
@@ -73,7 +44,7 @@ module.exports = function (api, seedHash) {
       if ((rez = loadNodeModules(x, y))) return rez
       throw new Error('not found ' + x + ' at ' + y)
     }
-    var module = { exports: {}, hash: entries[path].hash }
+    var module = { exports: {}, hash: id }
 
     compiledWrapper(module, module.exports, require, path, dir)
     cache[id] = module.exports
@@ -154,43 +125,4 @@ function loadCoreModule (x) {
     'fs': {}
   }
   return mods[x]
-}
-
-function ls (tree) {
-  return tree.bind(Json, function (t) {
-    var enames = Object.keys(t)
-    var trees = []
-    var list = enames.reduce(function (s, name) {
-      var e = t[name]
-      name = name.toLowerCase()
-      if (e instanceof Tree) {
-        trees.push({ name, tree: e })
-      }
-      s[name] = { type: e.constructor.name, hash: e.hash }
-      return s
-    }, {})
-    return trees
-      .map((x) => ls(x.tree).bind(Json, (v) => Object.keys(v).reduce((s, path) => (s[join(x.name, path)], s), {})))
-      .concat(Json.of(list))
-      .reduce((j1, j2) => j1.bind(Json, (v1) => j2.bind(Json, (v2) => Object.assign(v1, v2))))
-  })
-}
-
-function mkMemoizer () {
-  var cache = {}
-  return function (fn) {
-    return function (arg) {
-      arg = arg.toLowerCase()
-      if (typeof cache[arg] !== 'undefined') return cache[arg]
-      var rez = fn(arg)
-      cache[arg] = rez
-      return rez
-    }
-  }
-}
-
-function loadObj (Type, hash) {
-  var rez = new Type(() => Promise.resolve(hash))
-  rez.hash = hash
-  return rez
 }
