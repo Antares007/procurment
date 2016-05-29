@@ -4,9 +4,9 @@ const runInThisContext = require('vm').runInThisContext
 const join = require('path').join
 const dirname = require('path').dirname
 
+var cache = {}
 module.exports = function (api, seedHash) {
   var getModule = require('./fileloader')(api, seedHash)
-  var cache = {}
 
   global.seedHash = seedHash
 

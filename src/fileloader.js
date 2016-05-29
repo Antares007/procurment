@@ -3,6 +3,8 @@ const join = require('path').join
 const Blob = require('gittypes/blob')
 const Tree = require('gittypes/tree')
 
+const ecache = {}
+
 module.exports = function (api, treeHash) {
   const valueOf = deasync(function (hashish, cb) {
     hashish
@@ -11,9 +13,8 @@ module.exports = function (api, treeHash) {
       .catch((err) => cb(err))
   })
 
-  var entries = ls(treeHash)
-
-  function ls (treeHash) {
+  var ls = function (treeHash) {
+    if (ecache[treeHash]) return ecache[treeHash]
     var t = valueOf(loadObj(Tree, treeHash))
     var enames = Object.keys(t)
     var trees = []
@@ -26,11 +27,14 @@ module.exports = function (api, treeHash) {
       s[name] = { type: e.constructor.name, hash: e.hash }
       return s
     }, {})
-    return trees
+    var rez = trees
       .map((x) => prependPath(ls(x.tree.hash), x.name))
       .concat(list)
       .reduce((v1, v2) => Object.assign(v1, v2))
+    ecache[treeHash] = rez
+    return rez
   }
+  var entries = ls(treeHash)
   function prependPath (v, pre) {
     return Object.keys(v).reduce((s, path) => (s[join(pre, path)] = v[path], s), {})
   }
