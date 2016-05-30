@@ -16,10 +16,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "acorn": "^3.0.4",
-    "deasync": "^0.1.4",
+    "deasync": "^0.1.7",
     "debug": "^2.2.0",
     "git-sha1": "^0.1.2",
+    "js-git": "^0.7.7",
     "mkdirp": "^0.5.1"
   }
 }
