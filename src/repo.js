@@ -1,6 +1,8 @@
 var fs = require('./mac-fs.js')
 var Tree = require('gittypes/tree')
 var sha1 = require('git-sha1')
+const emptyTreeConent = new Buffer('tree 0\0', 'binary')
+const emptyTreeHash = sha1(emptyTreeConent)
 
 module.exports = function (gitDir) {
   var repo = {}
@@ -23,7 +25,9 @@ module.exports = function (gitDir) {
       })
     })
   }
+
   function valueOf (hash) {
+    if (hash === emptyTreeHash) return Promise.resolve(emptyTreeConent)
     return new Promise(function (resolve, reject) {
       repo.loadRaw(hash, function (err, buffer) {
         if (!buffer) {
@@ -36,7 +40,9 @@ module.exports = function (gitDir) {
       })
     })
   }
+
   function has (hash) {
+    if (hash === emptyTreeHash) return Promise.resolve(true)
     return new Promise(function (resolve, reject) {
       repo.loadRaw(hash, function (err, buffer) {
         if (err) {
