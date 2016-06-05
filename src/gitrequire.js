@@ -1,122 +1,88 @@
 'use strict'
-const debug = require('debug')('module')
-const runInThisContext = require('vm').runInThisContext
-const join = require('path').join
-const dirname = require('path').dirname
+const assert = require('assert').ok
+const deasync = require('deasync')
+const path = require('path')
 
-var cache = {}
+const Package = require('./package.js')
+const Blob = require('gittypes/blob')
+const Module = require('./module.js')
+
 module.exports = function (api, seedHash) {
-  var getModule = require('./fileloader')(api, seedHash)
+  const valueOf = deasync(function (hashish, cb) {
+    hashish
+      .valueOf(api)
+      .then((v) => cb(null, v))
+      .catch((err) => cb(err))
+  })
 
-  global.seedHash = seedHash
+  Package.prototype.load = function (request = null, packageBasePath = '/', parentModule = null) {
+    const self = this
+    const modulesBasePath = path.join(packageBasePath, 'src')
+    const pack = valueOf(this)
+    const srcEntries = pack.srcEntries
 
-  var exports = loadAsDirectory('/')
-  return exports
-
-  function load (mdl, path) {
-    var id = mdl.hash
-    debug(`load(cached = ${!!cache[id]})`, path)
-    if (cache[id]) return cache[id]
-    var dir = dirname(path)
-    var code = mdl.content
-    var wrappedCode = `(module, exports, require, __filename, __dirname) => {\n${code}\n}`
-    var opt = { filename: path, lineOffset: 0, displayErrors: true }
-    var compiledWrapper = runInThisContext(wrappedCode, opt)
-
-    // require(X) from module at path Y
-    // 1. If X is a core module,
-    //    a. return the core module
-    //    b. STOP
-    // 2. If X begins with './' or '/' or '../'
-    //    a. LOAD_AS_FILE(Y + X)
-    //    b. LOAD_AS_DIRECTORY(Y + X)
-    // 3. LOAD_NODE_MODULES(X, dirname(Y))
-    // 4. THROW "not found"
-    var require = function (x) {
-      var y = dir
-      var rez
-      debug(`require(${x}) at ${path}`)
-      if ((rez = loadCoreModule(x))) return rez
-      if (x.startsWith('/') || x.startsWith('./') || x.startsWith('../')) {
-        if ((rez = loadAsFile(join(y, x)))) return rez
-        if ((rez = loadAsDirectory(join(y, x)))) return rez
-      }
-      if ((rez = loadNodeModules(x, y))) return rez
-      throw new Error('not found ' + x + ' at ' + y)
-    }
-    var module = { exports: {}, hash: id }
-
-    compiledWrapper(module, module.exports, require, path, dir)
-    cache[id] = module.exports
-    return module.exports
-  }
-
-  // LOAD_AS_FILE(X)
-  // 1. If X is a file, load X as JavaScript text.  STOP
-  // 2. If X.js is a file, load X.js as JavaScript text.  STOP
-  // 3. If X.json is a file, parse X.json to a JavaScript Object.  STOP
-  // 4. If X.node is a file, load X.node as binary addon.  STOP
-  function loadAsFile (path) {
-    debug('loadAsFile', path)
-    var file
-    var filePath
-    if ((file = getModule(path))) return load(file, path)
-    if ((file = getModule((filePath = path + '.js')))) return load(file, filePath)
-  }
-
-  // LOAD_AS_DIRECTORY(X)
-  // 1. If X/package.json is a file,
-  //    a. Parse X/package.json, and look for "main" field.
-  //    b. let M = X + (json main field)
-  //    c. LOAD_AS_FILE(M)
-  // 2. If X/index.js is a file, load X/index.js as JavaScript text.  STOP
-  // 3. If X/index.json is a file, parse X/index.json to a JavaScript object. STOP
-  // 4. If X/index.node is a file, load X/index.node as binary addon.  STOP
-  function loadAsDirectory (path) {
-    debug('loadAsDirectory', path)
-    var file
-    var filePath
-    if ((file = getModule((filePath = join(path, 'package.json'))))) return loadAsFile(join(path, JSON.parse(file.content).main))
-    if ((file = getModule((filePath = join(path, 'index.js'))))) return load(file, filePath)
-  }
-
-  // LOAD_NODE_MODULES(X, START)
-  // 1. let DIRS=NODE_MODULES_PATHS(START)
-  // 2. for each DIR in DIRS:
-  //    a. LOAD_AS_FILE(DIR/X)
-  //    b. LOAD_AS_DIRECTORY(DIR/X)
-  function loadNodeModules (x, start) {
-    var dirs = nodeModulesPaths(start)
     var rez
-    debug('loadNodeModules', x, start, dirs)
-    for (var dir of dirs) {
-      if ((rez = loadAsFile(join(dir, x)))) return rez
-      if ((rez = loadAsDirectory(join(dir, x)))) return rez
-    }
-  }
-}
+    if ((rez = loadCoreModule(request))) return rez
 
-// NODE_MODULES_PATHS(START)
-// 1. let PARTS = path split(START)
-// 2. let I = count of PARTS - 1
-// 3. let DIRS = []
-// 4. while I >= 0,
-//    a. if PARTS[I] = "node_modules" CONTINUE
-//    c. DIR = path join(PARTS[0 .. I] + "node_modules")
-//    b. DIRS = DIRS + DIR
-//    c. let I = I - 1
-// 5. return DIRS
-function nodeModulesPaths (start) {
-  let parts = start.split('/')
-  var i = parts.length - 1
-  let dirs = []
-  while (i >= 0) {
-    if (parts[i] !== 'node_modules') {
-      dirs.push(parts.slice(0, i + 1).concat('node_modules').join('/'))
+    request = request || path.normalize(pack.main)
+
+    var reqModPath
+    if (!reqModPath && srcEntries[request]) reqModPath = request
+    if (!reqModPath && srcEntries[request + '.js']) reqModPath = request + '.js'
+    if (!reqModPath && srcEntries[request + '/index.js']) reqModPath = request + '/index.js'
+
+    if (reqModPath) {
+      var hash = srcEntries[reqModPath]
+      var id = self.hash + hash
+
+      if (Module._cache[id]) return Module._cache[id].exports
+
+      var blob = new Blob(() => Promise.resolve(hash))
+      var absPath = path.join(modulesBasePath, reqModPath)
+      var module = new Module(id, absPath, () => valueOf(blob), parentModule)
+      module.require = function (request) {
+        assert(request)
+        assert(typeof request === 'string')
+        if (request.startsWith('/')) throw new Error('absolute paths not supported')
+        if (request.startsWith('./') || request.startsWith('../')) {
+          var absPath = path.join(this.dirname, request)
+          if (!absPath.startsWith(modulesBasePath)) throw new Error('request outside of package')
+          var localPath = absPath.slice(modulesBasePath.length + 1)
+          return self.load(localPath, packageBasePath, this)
+        } else {
+          return self.load(request, packageBasePath, this)
+        }
+      }.bind(module)
+
+      Module._cache[id] = module
+
+      var hadException = true
+      try {
+        module.load()
+        hadException = false
+      } finally {
+        if (hadException) {
+          delete Module._cache[id]
+        }
+      }
+
+      return module.exports
     }
-    i = i - 1
+
+    var firstRequestSegment = request.split('/')[0]
+    var dep = pack.dependencies[firstRequestSegment]
+    if (dep) {
+      return dep.load(
+        request.slice(firstRequestSegment.length + 1),
+        path.join(packageBasePath, 'dependencies', firstRequestSegment),
+        parentModule
+      )
+    }
+    throw new Error('module not found')
   }
-  return dirs
+
+  var p = new Package(() => Promise.resolve(seedHash))
+  return p.load()
 }
 
 function loadCoreModule (x) {
