@@ -11,7 +11,7 @@ const path = require('path')
 const fs = require('fs')
 const splitRe = process.platform === 'win32' ? /[\/\\]/ : /\//
 const internalModuleStat = process.binding('fs').internalModuleStat
-const Package = require('../src/package.js')
+const Package = require('gittypes/package')
 
 const cache = {}
 

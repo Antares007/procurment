@@ -3,7 +3,7 @@ const assert = require('assert').ok
 const deasync = require('deasync')
 const path = require('path')
 
-const Package = require('./package.js')
+const Package = require('gittypes/package')
 const Blob = require('gittypes/blob')
 const Module = require('./module.js')
 
