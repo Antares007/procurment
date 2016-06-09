@@ -7,7 +7,16 @@ const Package = require('gittypes/package')
 const Blob = require('gittypes/blob')
 const Module = require('./module.js')
 
-module.exports = function (api, seedHash) {
+const internalModules = [ 'hashish', 'blob', 'tree', 'commit', 'seed', 'package', 'json' ].reduce(function (s, t) {
+  var name = 'gittypes/' + t
+  s[name] = require(name)
+  return s
+}, {
+  'crypto': require('crypto'),
+  'fs': {}
+})
+
+module.exports = function (api) {
   const valueOf = deasync(function (hashish, cb) {
     hashish
       .valueOf(api)
@@ -78,17 +87,10 @@ module.exports = function (api, seedHash) {
         parentModule
       )
     }
-    throw new Error('module not found')
+    throw new Error(`module [${request}] not found`)
   }
-
-  var p = new Package(() => Promise.resolve(seedHash))
-  return p.load()
 }
 
 function loadCoreModule (x) {
-  var mods = {
-    'crypto': require('crypto'),
-    'fs': {}
-  }
-  return mods[x]
+  return internalModules[x]
 }

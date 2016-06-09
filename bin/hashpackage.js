@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 'use strict'
-const gitDir = process.argv.length > 3
-  ? process.argv[2]
-  : require('path').resolve(process.cwd(), '.git')
-const targetPath = process.argv.length > 3
-  ? process.argv[3]
-  : process.argv[2]
+var argv = require('yargs').argv
+const gitDir = argv.gitDir || require('path').resolve(process.cwd(), '.git')
+const targetPath = argv._[0]
+
 const api = require('../src/repo')(gitDir)
 const path = require('path')
 const fs = require('fs')

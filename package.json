@@ -6,7 +6,8 @@
   "bin": {
     "grow": "./bin/grow.js",
     "hashdir": "./bin/hashdir.js",
-    "hashpackage": "./bin/hashpackage.js"
+    "hashpackage": "./bin/hashpackage.js",
+    "mkseed": "./bin/mkseed.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
