@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 'use strict'
-var argv = require('yargs').argv
-const gitDir = argv.gitDir || require('path').resolve(process.cwd(), '.git')
+const argv = require('yargs')
+  .default('git-dir', require('path').resolve(process.cwd(), '.git'))
+  .demand(2)
+  .argv
+const gitDir = argv.gitDir
 const packageHash = argv._[0]
 const argsHash = argv._[1]
 
