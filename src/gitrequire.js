@@ -63,6 +63,7 @@ module.exports = function (valueOf) {
       }
       module.require = requireFn.bind(module)
       module.require.asPackage = function (request) {
+        if (request === '.') return self
         var rez = pack.dependencies[request]
         if (!rez) throw new Error(`cant resolvePackage '${request}'`)
         return rez
