@@ -1,33 +1,31 @@
 'use strict'
 const assert = require('assert').ok
-const deasync = require('deasync')
 const path = require('path')
 
 const Package = require('gittypes/package')
 const Blob = require('gittypes/blob')
 const Module = require('./module.js')
+const debug = require('debug')('gitrequire')
 
-const internalModules = [ 'hashish', 'blob', 'tree', 'commit', 'seed', 'package', 'json' ].reduce(function (s, t) {
+const internalNodeModules = {
+  'crypto': require('crypto'),
+  'fs': {}
+}
+const internalModules = [
+  'hashish', 'blob', 'tree', 'commit',
+  'seed', 'package', 'fun', 'json'
+].reduce(function (s, t) {
   var name = 'gittypes/' + t
   s[name] = require(name)
   return s
-}, {
-  'crypto': require('crypto'),
-  'fs': {}
-})
+}, internalNodeModules)
 
-module.exports = function (api) {
-  const valueOf = deasync(function (hashish, cb) {
-    hashish
-      .valueOf(api)
-      .then((v) => cb(null, v))
-      .catch((err) => cb(err))
-  })
-
+module.exports = function (valueOf) {
   Package.prototype.load = function (request = null, packageBasePath = '/', parentModule = null) {
+    const pack = valueOf(this)
+    this.name = pack.name
     const self = this
     const modulesBasePath = path.join(packageBasePath, 'src')
-    const pack = valueOf(this)
     const srcEntries = pack.srcEntries
 
     var rez
@@ -45,11 +43,12 @@ module.exports = function (api) {
       var id = self.hash + hash
 
       if (Module._cache[id]) return Module._cache[id].exports
+      debug(pack.name, request, id)
 
       var blob = new Blob(() => Promise.resolve(hash))
       var absPath = path.join(modulesBasePath, reqModPath)
-      var module = new Module(id, absPath, () => valueOf(blob), parentModule)
-      module.require = function (request) {
+      var module = new Module(id, absPath, parentModule)
+      var requireFn = function (request) {
         assert(request)
         assert(typeof request === 'string')
         if (request.startsWith('/')) throw new Error('absolute paths not supported')
@@ -61,13 +60,20 @@ module.exports = function (api) {
         } else {
           return self.load(request, packageBasePath, this)
         }
-      }.bind(module)
+      }
+      module.require = requireFn.bind(module)
+      module.require.asPackage = function (request) {
+        var rez = pack.dependencies[request]
+        if (!rez) throw new Error(`cant resolvePackage '${request}'`)
+        return rez
+      }
 
       Module._cache[id] = module
 
       var hadException = true
       try {
-        module.load()
+        var script = valueOf(blob).toString()
+        module.load(script)
         hadException = false
       } finally {
         if (hadException) {

@@ -12,13 +12,16 @@ const api = require('../src/repo')(gitDir)
 
 const Seed = require('gittypes/seed')
 const Package = require('gittypes/package')
+const Tree = require('gittypes/tree')
 const GitObject = require('gittypes/gitobject')
 
 var args = new GitObject(() => Promise.resolve(argsHash))
 
 args.bind(Seed, function (a) {
   return Seed.of({
-    args: new (require(`gittypes/${a.type}`))(() => Promise.resolve(argsHash)),
+    args: Tree.of({
+      '000': new (require(`gittypes/${a.type}`))(() => Promise.resolve(argsHash))
+    }),
     fn: new Package(() => Promise.resolve(packageHash))
   })
 }).getHash(api)

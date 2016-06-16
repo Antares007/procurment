@@ -4,11 +4,10 @@ const runInThisContext = require('vm').runInThisContext
 const path = require('path')
 
 class Module {
-  constructor (id, filename, contentFn, parent) {
+  constructor (id, filename, parent) {
     this.id = id
     this.filename = filename
     this.dirname = path.dirname(filename)
-    this.contentFn = contentFn
     this.exports = {}
     this.loaded = false
     this.children = []
@@ -16,12 +15,10 @@ class Module {
     if (parent) parent.children.push(this)
   }
 
-  _compile () {
-    var wrappedCode = `(function (exports, require, module, __filename, __dirname) {
-      ${this.contentFn().toString('utf8')}
-    })`
+  _compile (script) {
+    var wrappedCode = `(function (exports, require, module, __filename, __dirname) {${script}})`
     var compiledWrapper = runInThisContext(wrappedCode, {
-      filename: path,
+      filename: this.filename,
       lineOffset: 0,
       displayErrors: true
     })
@@ -29,10 +26,10 @@ class Module {
     compiledWrapper.apply(this.exports, args)
   }
 
-  load () {
+  load (script) {
     debug('load %j for module %j', this.filename, this.id)
     assert(!this.loaded)
-    this._compile()
+    this._compile(script)
     this.loaded = true
   }
 }
