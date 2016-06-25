@@ -14,27 +14,56 @@ const valueOf = deasync(function (hashish, cb) {
   hashish
     .valueOf(api)
     .then((v) => cb(null, v))
-    .catch((err) => cb(err))
+    .catch((err) => {
+      cb(err)
+    })
 })
 
+const path = require('path')
+const fs = require('fs')
+
+const Seed = require('gittypes/seed')
+const Json = require('gittypes/json')
+const Tree = require('gittypes/tree')
+const mkdirp = require('mkdirp')
 require('../src/gitrequire')(valueOf)
 
-api.grow = grow
+api.grow = function (seedHash) {
+  return grow(seedHash)
+    .catch((err) => process.nextTick(function () { throw err }))
+}
 
+debug('start')
 grow(seedHash)
-  .then((v) => console.log(v))
-  .catch((err) => process.nextTick(function () { throw err }))
+    .then((v) => console.log(v))
+    .catch((err) => process.nextTick(function () { throw err }))
 
 function grow (seedHash) {
-  const Seed = require('gittypes/seed')
-  var seed = new Seed(() => Promise.resolve(seedHash))
-  var s = valueOf(seed)
-  exports = s.fn.load()
-  var t = valueOf(s.args)
-  var args = Object.keys(t).map((i) => t[i])
-  var argsStr = args.map((a) => `${a.constructor.name}_${a.hash.slice(0, 6)}`).join(', ')
-  return exports.apply(s.fn, args).getHash(api).then(function (hash) {
-    debug(`${s.fn.name}_${s.fn.hash.slice(0, 6)}(${argsStr}) => ${hash.slice(0, 6)}`)
-    return hash
-  })
+  var rez
+  var cachePath = path.resolve(__dirname, '../.cache', seedHash.slice(0, 2), seedHash.slice(2))
+  try {
+    mkdirp.sync(path.dirname(cachePath))
+    rez = fs.readFileSync(cachePath, 'utf8')
+    return Promise.resolve(rez)
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err
+    return new Seed(() => Promise.resolve(seedHash)).bind(Tree, function (s) {
+      var exports = s.fn.load()
+      return s.args.bind(Tree, function (t) {
+        var args = Object.keys(t).map((i) => t[i])
+        var argsStr = args.map((a) => `${a.constructor.name}_${a.hash.slice(0, 6)}`).join(', ')
+        return Tree.of({
+          result: exports.apply(s.fn, args),
+          stats: Json.of(`${s.fn.name}_${s.fn.hash.slice(0, 6)}(${argsStr})`)
+        })
+      })
+    })
+    .valueOf(api).then(function (rez) {
+      return Promise.all([rez.stats.valueOf(api), rez.result.getHash(api)]).then(function ([stats, hash]) {
+        fs.writeFileSync(cachePath, hash, 'utf8')
+        debug(`${stats} => ${hash.slice(0, 6)}`)
+        return hash
+      })
+    })
+  }
 }

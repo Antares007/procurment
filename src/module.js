@@ -27,12 +27,11 @@ class Module {
   }
 
   load (script) {
-    debug('load %j for module %j', this.filename, this.id)
+    debug(`load ${this.id.slice(0, 6)}:${this.filename.slice(1)}`)
     assert(!this.loaded)
     this._compile(script)
     this.loaded = true
   }
 }
-module.exports = Module
-
 Module._cache = {}
+module.exports = Module

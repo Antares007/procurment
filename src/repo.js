@@ -3,7 +3,7 @@ var Tree = require('gittypes/tree')
 var sha1 = require('git-sha1')
 const emptyTreeConent = new Buffer('tree 0\0', 'binary')
 const emptyTreeHash = sha1(emptyTreeConent)
-const _cache = new WeakMap()
+const _cache = new Map()
 
 module.exports = function (gitDir) {
   var repo = {}

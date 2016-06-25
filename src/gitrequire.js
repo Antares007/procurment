@@ -78,6 +78,7 @@ module.exports = function (valueOf) {
         hadException = false
       } finally {
         if (hadException) {
+          console.log('eeeeeeeeeeeeeee')
           delete Module._cache[id]
         }
       }
