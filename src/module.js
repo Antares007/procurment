@@ -18,7 +18,7 @@ class Module {
   _compile (script) {
     var wrappedCode = `(function (exports, require, module, __filename, __dirname) {${script}})`
     var compiledWrapper = runInThisContext(wrappedCode, {
-      filename: this.filename,
+      filename: this.id.slice(0, 6) + ':' + this.filename.slice(1),
       lineOffset: 0,
       displayErrors: true
     })
