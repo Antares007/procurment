@@ -10,13 +10,17 @@ const seedHash = argv._[0]
 const debug = require('debug')('grow')
 const api = require('../src/repo')(gitDir)
 const deasync = require('deasync')
-const valueOf = deasync(function (hashish, cb) {
+const valueOfSync = deasync(function (hashish, cb) {
   hashish
     .valueOf(api)
     .then((v) => cb(null, v))
-    .catch((err) => {
-      cb(err)
-    })
+    .catch((err) => cb(err))
+})
+const getHashSync = deasync(function (hashish, cb) {
+  hashish
+    .getHash(api)
+    .then((v) => cb(null, v))
+    .catch((err) => cb(err))
 })
 
 const path = require('path')
@@ -26,7 +30,7 @@ const Seed = require('gittypes/seed')
 const Json = require('gittypes/json')
 const Tree = require('gittypes/tree')
 const mkdirp = require('mkdirp')
-require('../src/gitrequire')(valueOf)
+require('../src/gitrequire')(valueOfSync, grow)
 
 api.grow = function (seedHash) {
   return grow(seedHash)
@@ -34,11 +38,12 @@ api.grow = function (seedHash) {
 }
 
 debug('start')
-grow(seedHash)
+grow(new Seed(() => Promise.resolve(seedHash)))
     .then((v) => console.log(v))
     .catch((err) => process.nextTick(function () { throw err }))
 
-function grow (seedHash) {
+function grow (seed) {
+  var seedHash = getHashSync(seed)
   var rez
   var cachePath = path.resolve(__dirname, '../.cache', seedHash.slice(0, 2), seedHash.slice(2))
   try {
@@ -47,7 +52,7 @@ function grow (seedHash) {
     return Promise.resolve(rez)
   } catch (err) {
     if (err.code !== 'ENOENT') throw err
-    return new Seed(() => Promise.resolve(seedHash)).bind(Tree, function (s) {
+    return seed.bind(Tree, function (s) {
       var exports = s.fn.load()
       return s.args.bind(Tree, function (t) {
         var args = Object.keys(t).map((i) => t[i])

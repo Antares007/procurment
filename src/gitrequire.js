@@ -3,6 +3,8 @@ const assert = require('assert').ok
 const path = require('path')
 
 const Package = require('gittypes/package')
+const Seed = require('gittypes/seed')
+const Tree = require('gittypes/tree')
 const Blob = require('gittypes/blob')
 const Module = require('./module.js')
 const debug = require('debug')('gitrequire')
@@ -20,9 +22,19 @@ const internalModules = [
   return s
 }, internalNodeModules)
 
-module.exports = function (valueOf) {
+module.exports = function (valueOfSync, grow) {
+  Package.prototype.call = function (Type, ...args) {
+    args = args.reduce(function (s, a, i) {
+      s[('000' + i.toString()).slice(-3)] = a
+      return s
+    }, {})
+    var argsTree = Tree.of(args)
+    return new Type(() => grow(Seed.of({ args: argsTree, fn: this })))
+    // return Seed.of({ args: argsTree, fn: this }).call(Type)
+  }
+
   Package.prototype.load = function (request = null, packageBasePath = '/', parentModule = null) {
-    const pack = valueOf(this)
+    const pack = valueOfSync(this)
     this.name = pack.name
     const self = this
     const modulesBasePath = path.join(packageBasePath, 'src')
@@ -73,7 +85,7 @@ module.exports = function (valueOf) {
 
       var hadException = true
       try {
-        var script = valueOf(blob).toString()
+        var script = valueOfSync(blob).toString()
         module.load(script)
         hadException = false
       } finally {
