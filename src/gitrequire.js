@@ -11,6 +11,11 @@ const debug = require('debug')('gitrequire')
 
 const internalNodeModules = {
   'crypto': require('crypto'),
+  'zlib': require('zlib'),
+  'util': require('util'),
+  'stream': require('stream'),
+  'events': require('events'),
+  'buffer': require('buffer'),
   'fs': {}
 }
 const internalModules = [

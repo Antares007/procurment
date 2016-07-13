@@ -3,14 +3,22 @@ const debug = require('debug')('module')
 const runInThisContext = require('vm').runInThisContext
 const path = require('path')
 
-const fakeDate = class Date {
-  getHours () { return 0 }
-  getMinutes () { return 0 }
-  getSeconds () { return 0 }
-  getFullYear () { return 1975 }
-  getMonth () { return 10 }
-  getDate () { return 14 }
-}
+const fakeDate = (function (RealDate) {
+  function Date (...args) {
+    var dt = args.length > 0 ? new RealDate(...args) : new RealDate('1975-11-14')
+    if (!new.target) return dt.toString()
+    Object.defineProperty(this, '_date', { value: dt })
+  }
+  var proto = RealDate.prototype
+  Object.getOwnPropertyNames(proto)
+    .filter((n) => typeof proto[n] === 'function' && n !== 'constructor')
+    .forEach(function (name) {
+      Date.prototype[name] = function (...args) { // eslint-disable-line
+        return this._date[name](...args)
+      }
+    })
+  return Date
+})(Date)
 
 class Module {
   constructor (id, filename, parent) {
