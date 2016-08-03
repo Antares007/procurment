@@ -16,6 +16,7 @@ const internalNodeModules = {
   'stream': require('stream'),
   'events': require('events'),
   'buffer': require('buffer'),
+  'path': require('path'),
   'fs': {}
 }
 const internalModules = [
